@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>TOEFL 105 トレーナー</title>
 <meta name="theme-color" content="#172A5C" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#111B36" media="(prefers-color-scheme: dark)">
@@ -22,6 +22,8 @@
   --paper:#F2F4FA; --card:#FFFFFF; --ink:#172A5C; --muted:#5A6687; --line:#D5DBEA; --soft:#E8ECF6;
   --bar:#172A5C; --bar-ink:#FFFFFF;
   --hl:#E8944A; --hl-ink:#172A5C;
+  /* gap under the bottom tabs: the phone's home-indicator area when the browser reports one (needs viewport-fit=cover), and never less than 12px, so the tabs do not sit on the screen edge */
+  --sab:max(12px, env(safe-area-inset-bottom, 0px));
   --good:#167A4A; --good-bg:#E2F3E9; --bad:#B9361D; --bad-bg:#FBE6E0;
   --f-display:'Source Serif 4',Georgia,'Times New Roman',serif; /* numerals and heading letters; always rendered at weight 600 (replaced Instrument Serif) */
   --f-ui:'BIZ UDPGothic','Hiragino Kaku Gothic ProN','Yu Gothic',system-ui,sans-serif;
@@ -42,14 +44,14 @@
 }
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-ui);font-size:15px;line-height:1.6;padding-bottom:calc(78px + env(safe-area-inset-bottom))}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-ui);font-size:15px;line-height:1.6;padding-bottom:calc(78px + var(--sab))}
 a{color:inherit}
 button,input,textarea,select{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 h1,h2,h3{text-wrap:balance}
 h3{font-size:13px;margin:0 0 4px;color:var(--muted);letter-spacing:.03em}
 [hidden]{display:none!important}
-.top{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 16px;background:var(--bar);color:var(--bar-ink);border-bottom:1px solid var(--line)}
+.top{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:calc(10px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 10px max(16px, env(safe-area-inset-left, 0px));background:var(--bar);color:var(--bar-ink);border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:8px;text-decoration:none;font-weight:700;font-size:14px;white-space:nowrap;min-width:0}
 .brand-mark{font-family:var(--f-display);font-weight:600;font-size:20px;line-height:1;background:var(--hl);color:var(--hl-ink);padding:3px 6px 1px;border-radius:3px}
 @media (max-width:419px){.brand-tail{display:none}}
@@ -58,9 +60,9 @@ h3{font-size:13px;margin:0 0 4px;color:var(--muted);letter-spacing:.03em}
 .chip.quiet{color:var(--muted)}
 .chip.ok{border-color:var(--good);color:var(--good)}
 .chip.err{border-color:var(--bad);color:var(--bad)}
-main{max-width:720px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:14px}
+main{max-width:720px;margin:0 auto;padding:16px max(16px, env(safe-area-inset-right, 0px)) 16px max(16px, env(safe-area-inset-left, 0px));display:flex;flex-direction:column;gap:14px}
 main:focus{outline:none}
-.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;display:grid;grid-template-columns:repeat(6,1fr);background:var(--card);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;display:grid;grid-template-columns:repeat(6,1fr);background:var(--card);border-top:1px solid var(--line);padding:6px max(4px, env(safe-area-inset-right, 0px)) calc(6px + var(--sab)) max(4px, env(safe-area-inset-left, 0px))}
 .tabs a{display:flex;flex-direction:column;align-items:center;gap:3px;text-decoration:none;color:var(--muted);font-size:10.5px;padding:2px 0}
 .tabs b{font-family:var(--f-display);font-weight:600;font-size:19px;line-height:1;min-width:36px;text-align:center;padding:5px 4px 3px;border-radius:4px}
 .tabs a.on{color:var(--ink);font-weight:700}
@@ -348,7 +350,7 @@ select{border:1px solid var(--line);border-radius:8px;padding:8px 10px;backgroun
 .working::after{content:'';display:inline-block;width:10px;height:10px;margin-left:8px;border:2px solid var(--muted);border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;vertical-align:-1px}
 @keyframes spin{to{transform:rotate(360deg)}}
 textarea.backup{width:100%;min-height:110px;border:1px solid var(--line);border-radius:8px;padding:10px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:var(--card)}
-#toast{position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:8px 14px;border-radius:8px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw;text-align:center;z-index:9}
+#toast{position:fixed;left:50%;bottom:calc(86px + var(--sab));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:8px 14px;border-radius:8px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw;text-align:center;z-index:9}
 #toast.on{opacity:1}
 @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
 </style>
