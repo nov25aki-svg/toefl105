@@ -1,0 +1,15 @@
+tests/screenshots/
+__pycache__/
+*.pyc
+node_modules/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+
+# Published repository holds only the app itself (index.html, manifest.json, sw.js, icons/).
+# Development notes and tests stay local.
+CLAUDE.md
+README.md
+.claude/
+tests/
