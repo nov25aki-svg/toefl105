@@ -153,6 +153,14 @@ details.card[open]>summary::after{content:"−"}
 .wlist li .small{white-space:nowrap}
 .tick{width:22px;height:22px;border:1.5px solid var(--ink);border-radius:4px;display:grid;place-items:center;flex:none;font-size:13px;font-weight:700}
 .plan li.done .tick{background:var(--hl);border-color:var(--hl);color:var(--hl-ink)}
+/* an answer finished a row of today's menu: the menu's done tick and 「ホームに戻る」 (the box sits under 次へ; scroll-margin keeps it clear of the bottom tabs) */
+.mdone{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--soft);text-align:left;scroll-margin:12px 0 calc(90px + var(--sab))}
+.mdone-t{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;line-height:1.5}
+.mdone-t>span:last-child{min-width:0;text-wrap:pretty}
+.mdone-t .tick{background:var(--hl);border-color:var(--hl);color:var(--hl-ink)}
+.result .mdone-t{margin-top:6px}
+.flash>.mdone-t{justify-content:center}
+#rpRes .mdone{margin-top:10px}
 .plan li.done .lbl{color:var(--muted);text-decoration:line-through}
 .plan .lbl{flex:1;min-width:0}
 .plan .sec{font-family:var(--f-display);font-weight:600;font-size:17px;width:22px;text-align:center;flex:none}
@@ -1601,7 +1609,8 @@ const UI = {
   iv:{id:"i1", i:0, ans:[], scores:[], played:false, done:false},
   rv:null, focusExam:false, recDay:null,   /* recDay: the day picked on the #record calendar ("YYYY-MM-DD"), null = today */
   vq:null, vshow:false, vundo:null, sess:null, sessDay:"", lastDay:today(),
-  lsn:null, lsnHid:false   /* lsn: {key, list:[word…], batch, i (index in the batch), step, round, note, all} */
+  lsn:null, lsnHid:false,   /* lsn: {key, list:[word…], batch, i (index in the batch), step, round, note, all} */
+  mdone:null, mseen:[]   /* mdone: {k, ref, i, rows:[{key, label}]} = the menu rows the last answer finished (menuMark); mseen: "date:session:task" already announced */
 };
 const newIv = id => ({id, i:0, ans:[], scores:[], played:false, went:false, running:false, done:false});
 
@@ -2054,6 +2063,11 @@ function qsHTML(qs, key, id) {
 const missNote = n => n ? `<p class="muted small" style="font-weight:400">間違えた${n}問は復習リストに入りました（ホームから解き直せます）。</p>` : "";
 function scriptHTML(lines) { return `<div class="script">${lines.map(l => `<p><b>${esc(l.sp)}</b>${esc(l.text)}</p>`).join("")}</div>`; }
 function rerenderSub(html) { const s = $("#sub"); if (s) s.innerHTML = html; }
+/* 「ホームに戻る」: at the end of a set (main = a task of today's menu) and in the note shown when an answer finishes a menu row */
+const homeBtn = (main, wide) => `<button class="btn${main ? " primary" : ""}${wide ? " wide" : ""}" data-act="home">ホームに戻る</button>`;
+const mdoneLine = rows => rows ? `<p class="mdone-t"><span class="tick" aria-hidden="true">✓</span><span>今日のメニューの${rows.map(r => "『" + esc(r.label) + "』").join("と")}が終わりました</span></p>` : "";
+/* the note with its own button, for a question that is not the last of its set (the end-of-set screen shows mdoneLine next to its own homeBtn) */
+const mdoneBox = rows => rows ? `<div class="mdone" role="status">${mdoneLine(rows)}${homeBtn(true, true)}</div>` : "";
 
 /* ================= HOME ================= */
 function bandsInfo() {
@@ -2106,6 +2120,26 @@ function curSess(ss) {
   }
   return ss.find(q => q.id === id);
 }
+/* ---- an answer that finishes a menu row: menuSnap(k) before anything is counted, menuMark() after.
+   Each row is announced once a day (UI.mseen); UI.mdone belongs to one question of one set (ref = the task's UI object, i = its index)
+   and is replaced on the next answer, so it goes away with the next question. ---- */
+function menuSnap(k) { const o = {}; sessions().forEach(s => s.rows.forEach(r => { if (r.k === k) o[s.id] = rowInfo(r).done; })); return o; }
+function menuDone(k, snap) {
+  const day = today(), rows = [];
+  UI.mseen = UI.mseen.filter(x => x.startsWith(day + ":"));
+  sessions().forEach(s => s.rows.forEach(r => {
+    const key = day + ":" + s.id + ":" + k;
+    if (r.k === k && snap[s.id] === false && rowInfo(r).done && !UI.mseen.includes(key)) { UI.mseen.push(key); rows.push({key, label:r.label}); }
+  }));
+  return rows.length ? rows : null;
+}
+function menuMark(k, snap, ref, i) {
+  const rows = menuDone(k, snap);
+  UI.mdone = rows ? {k, ref, i, rows} : null;
+  if (rows) requestAnimationFrame(() => { const e = $(".mdone"); if (e) e.scrollIntoView({block:"nearest"}); });   /* after the re-render; the box sits under the 次へ button */
+}
+/* the rows to announce on this screen; i == null: any question of the set (the end-of-set screen) */
+const mdoneAt = (k, ref, i) => { const m = UI.mdone; return m && m.k === k && m.ref === ref && (i == null || m.i === i) ? m.rows : null; };
 const DESK = [["ctw", "Complete the Words 1セット", "約5分"], ["daily", "Read in Daily Life 3問", "約5分"], ["academic", "Academic Passage 5問", "約8分"], ["email", "Write an Email 1本", "約7分"], ["disc", "Academic Discussion 1本", "約10分"]];
 function daysLeft() { if (!S.examDate) return null; const t = new Date(S.examDate + "T00:00:00"); const n = new Date(); n.setHours(0, 0, 0, 0); return Math.round((t - n) / DAY); }
 function updateExamChip() { const c = $("#examChip"); const d = daysLeft(); c.textContent = d == null ? "試験日を設定" : d > 0 ? "本番まで " + d + "日" : d === 0 ? "本番は今日" : "試験日を更新"; }
@@ -2261,7 +2295,7 @@ function cardHTML() {
   syncQueue();
   if (!UI.vq || !UI.vq.length) {
     const left = vWords().filter(x => !S.vocab[x.w]).length;
-    return `<div class="card flash">${undoLine()}<div class="word">Done</div><p>今日の復習は完了しました。</p><div class="row" style="justify-content:center">${left ? `<button class="btn" data-act="v-more">新しい単語をあと10語</button>` : ""}<button class="btn ghost ai-only" data-act="v-ai">AIで単語を10語追加</button></div><p class="muted small">未学習 ${left}語</p><div id="vAiOut"></div></div>`;
+    return `<div class="card flash">${undoLine()}<div class="word">Done</div><p>今日の復習は完了しました。</p>${mdoneLine(mdoneAt("vocab", null))}<div class="row" style="justify-content:center">${homeBtn(true)}${left ? `<button class="btn" data-act="v-more">新しい単語をあと10語</button>` : ""}<button class="btn ghost ai-only" data-act="v-ai">AIで単語を10語追加</button></div><p class="muted small">未学習 ${left}語</p><div id="vAiOut"></div></div>`;
   }
   const it = findWord(UI.vq[0]); if (!it) { UI.vq.shift(); return cardHTML(); }
   const rec = S.vocab[it.w]; const b = rec ? rec.b : 0; const ja = S.prefs.vmode === "ja";
@@ -2280,6 +2314,7 @@ function cardHTML() {
     ${UI.vshow ? back : ""}
     ${!ja || UI.vshow ? `<div class="row" style="justify-content:center"><button class="btn sm ghost audio-only" data-act="v-say">発音</button>${UI.vshow ? `<button class="btn sm ghost audio-only" data-act="v-say-ex">例文を聞く</button>` : ""}</div>` : ""}
     ${grades}
+    ${mdoneBox(mdoneAt("vocab", null))}
   </div>`;
 }
 function vocabView() {
@@ -2365,7 +2400,7 @@ function newChooseSet(items) { UI.ch = {items:items || shuffle(pool("choose")).s
 function chooseHTML() {
   if (!UI.ch) newChooseSet();
   const c = UI.ch;
-  if (c.done) return `<div class="card"><h2>Listen and Choose a Response</h2><p class="result">結果 <b>${c.correct}</b> / ${c.items.length}</p>${missNote(c.items.length - c.correct)}<div class="row"><button class="btn primary" data-act="ch-new">もう1セット</button><button class="btn ghost ai-only" data-act="ch-ai">AIで新しい6問</button></div><div id="genOut"></div></div>`;
+  if (c.done) return `<div class="card"><h2>Listen and Choose a Response</h2><p class="result">結果 <b>${c.correct}</b> / ${c.items.length}</p>${missNote(c.items.length - c.correct)}${mdoneLine(mdoneAt("choose", c))}<div class="row">${homeBtn(true)}<button class="btn" data-act="ch-new">もう1セット</button><button class="btn ghost ai-only" data-act="ch-ai">AIで新しい6問</button></div><div id="genOut"></div></div>`;
   const it = c.items[c.i]; const showOpts = c.plays > 0 || c.reveal || !hasAudio();
   return `<div class="card">
     <div class="spread"><h2>Listen and Choose a Response</h2><span class="muted small">問 ${c.i + 1} / ${c.items.length}</span></div>
@@ -2373,7 +2408,7 @@ function chooseHTML() {
     <div class="player audio-only"><button class="play" data-act="ch-play" aria-label="再生">${ICON_PLAY}</button><div><div id="plStat">タップして再生</div><div class="muted small">再生 ${c.plays}回</div></div></div>
     ${(c.reveal || !hasAudio() || c.ans != null) ? `<p class="script">${esc(it.say)}</p>` : `<button class="btn sm ghost audio-only" data-act="ch-reveal" style="align-self:flex-start">音声が出ないときは文を表示</button>`}
     ${showOpts ? `<div class="q" style="border-top:0;padding-top:0">${optsHTML(it, c.ans, "ch-ans")}</div>` : `<p class="muted small">再生すると選択肢が表示されます。</p>`}
-    ${c.ans != null ? `<div class="exp">${c.ans === it.a ? "<b>正解。</b>" : "<b>不正解。</b>"}${esc(it.exp || "")}</div><button class="btn primary" data-act="ch-next">${c.i + 1 < c.items.length ? "次へ" : "結果を見る"}</button>` : ""}
+    ${c.ans != null ? `<div class="exp">${c.ans === it.a ? "<b>正解。</b>" : "<b>不正解。</b>"}${esc(it.exp || "")}</div><button class="btn primary" data-act="ch-next">${c.i + 1 < c.items.length ? "次へ" : "結果を見る"}</button>${c.i + 1 < c.items.length ? mdoneBox(mdoneAt("choose", c, c.i)) : ""}` : ""}
   </div>`;
 }
 function talkTypeJa(t) { return t === "conversation" ? "会話" : t === "announcement" ? "アナウンス" : "講義"; }
@@ -2400,7 +2435,7 @@ function listeningView() { view().innerHTML = head("listening") + `<div class="c
 
 /* ================= WRITING ================= */
 function newBas(items) {
-  const its = items || shuffle(pool("bas")).slice(0, 10);
+  const its = items || shuffle(pool("bas")).slice(0, 5); /* 5 = the menu row ("Build a Sentence 5問"), so the row ends on the result screen and the set is logged; the real test has 10 */
   UI.bas = {items:its, i:0, placed:[], tiles:[], res:null, correct:0, done:false, started:false};
   prepTiles(UI.bas);
 }
@@ -2418,13 +2453,13 @@ function basBoard(b, ctx) {
 function basHTML() {
   if (!UI.bas) newBas();
   const b = UI.bas;
-  if (b.done) return `<div class="card"><h2>Build a Sentence</h2><p class="result">結果 <b>${b.correct}</b> / ${b.items.length}</p>${missNote(b.items.length - b.correct)}<div class="row"><button class="btn primary" data-act="bas-new">もう1セット</button><button class="btn ghost ai-only" data-act="bas-ai">AIで新しい6問</button></div><div id="genOut"></div></div>`;
+  if (b.done) return `<div class="card"><h2>Build a Sentence</h2><p class="result">結果 <b>${b.correct}</b> / ${b.items.length}</p>${missNote(b.items.length - b.correct)}${mdoneLine(mdoneAt("bas", b))}<div class="row">${homeBtn(true)}<button class="btn" data-act="bas-new">もう1セット</button><button class="btn ghost ai-only" data-act="bas-ai">AIで新しい6問</button></div><div id="genOut"></div></div>`;
   return `<div class="card">
     <div class="spread"><h2>Build a Sentence</h2><span class="timer sm" id="basT">${fmt(b.started ? Math.max(0, Math.round((b.end - Date.now()) / 1000)) : Math.round(39 * b.items.length))}</span></div>
-    <p class="muted small">語句を並べて、会話として自然で正しい文を作ります。不要な語句が1つ混ざることがあります。本番は10問で約6分半。</p>
+    <p class="muted small">語句を並べて、会話として自然で正しい文を作ります。不要な語句が1つ混ざることがあります。本番は10問で約6分半（ここでは5問ずつ）。</p>
     <div class="spread small muted"><span>問 ${b.i + 1} / ${b.items.length}</span><span>正解 ${b.correct}</span></div>
     ${basBoard(b)}
-    ${b.res ? `<button class="btn primary" data-act="bas-next">${b.i + 1 < b.items.length ? "次へ" : "結果を見る"}</button>` : ""}
+    ${b.res ? `<button class="btn primary" data-act="bas-next">${b.i + 1 < b.items.length ? "次へ" : "結果を見る"}</button>${b.i + 1 < b.items.length ? mdoneBox(mdoneAt("bas", b, b.i)) : ""}` : ""}
   </div>`;
 }
 function startBasTimer() { if (UI.bas && !UI.bas.done) { if (!UI.bas.started) { UI.bas.started = true; UI.bas.end = Date.now() + Math.round(39 * UI.bas.items.length) * 1000; } const left = Math.max(0, Math.round((UI.bas.end - Date.now()) / 1000)); Timer.start(left, "basT", () => { const e = $("#basT"); if (e) { e.textContent = "時間切れ"; } }, 30); } }
@@ -2454,9 +2489,12 @@ function writeTaskHTML(k) {
     <p class="no-ai muted small">AI採点はこの画面では使えません。セルフチェックで見直しましょう。</p>
     <div id="wSelf"></div>
     <div id="wFb" aria-live="polite"></div>
+    <div id="wHome"></div>
     ${hist.length ? `<details><summary class="small">これまでの提出（${hist.length}）</summary><ul class="hist">${hist.map(h => `<li><div class="spread small"><b>${esc(h.title)}</b><span>${h.score != null ? fbScore(h.score).toFixed(1) + " / 5" : ""} ・ ${new Date(h.t).toLocaleDateString("ja-JP")}</span></div><p class="small muted">${esc(h.summary || "")}</p></li>`).join("")}</ul></details>` : ""}
   </div>`;
 }
+/* one slot for both ways of finishing (self-check, AI feedback), so the button never appears twice */
+function wHome() { const h = $("#wHome"); if (h) h.innerHTML = `<div class="row">${homeBtn(false)}</div>`; }
 function writingSub() { return UI.writing === "bas" ? basHTML() : writeTaskHTML(UI.writing); }
 function writingView() { view().innerHTML = head("writing") + seg("writing", [["bas","Build a Sentence"],["email","Write an Email"],["disc","Academic Discussion"]], UI.writing) + `<div id="sub">${writingSub()}</div>`; if (UI.writing === "bas") startBasTimer(); }
 
@@ -2481,7 +2519,7 @@ function repeatHTML() {
   const pills = `<div class="pills">${P.map(x => `<button class="pill ${x.id === set.id ? "on" : ""}" data-act="rp-set" data-id="${esc(x.id)}">${esc(x.title)}</button>`).join("")}<button class="pill ai-only" data-act="rp-ai">＋AIで作る</button></div><div id="genOut"></div>`;
   if (r.done) {
     const ok = r.res.filter(x => x >= 0.9).length;
-    return `<div class="card"><h2>Listen and Repeat</h2>${pills}<p class="result">正確に言えた文 <b>${ok}</b> / ${n}</p>${dotsHTML(r.res, -1, n)}<div class="script">${set.sentences.map((s, k) => `<p><b>${k + 1}</b>${esc(s)} <span class="muted small">${r.res[k] != null ? Math.round(r.res[k] * 100) + "%" : ""}</span></p>`).join("")}</div><div class="row"><button class="btn primary" data-act="rp-restart">もう一度</button></div></div>`;
+    return `<div class="card"><h2>Listen and Repeat</h2>${pills}<p class="result">正確に言えた文 <b>${ok}</b> / ${n}</p>${dotsHTML(r.res, -1, n)}<div class="script">${set.sentences.map((s, k) => `<p><b>${k + 1}</b>${esc(s)} <span class="muted small">${r.res[k] != null ? Math.round(r.res[k] * 100) + "%" : ""}</span></p>`).join("")}</div>${mdoneLine(mdoneAt("repeat", r))}<div class="row">${homeBtn(true)}<button class="btn" data-act="rp-restart">もう一度</button></div></div>`;
   }
   const sent = set.sentences[r.i];
   const checked = r.res[r.i] != null;
@@ -2502,7 +2540,8 @@ function repeatHTML() {
 }
 function rpResHTML(sent) {
   const r = UI.rp; const a = r.res[r.i]; const d = r.lastDiff;
-  return `<div class="exp">${d ? `<div class="diff">${d}</div>` : `<p class="script" style="background:transparent;padding:0">${esc(sent)}</p>`}<div class="small" style="margin-top:6px">${d ? "一致率 " + Math.round(a * 100) + "%（赤い語が抜け・違い）" : "自己採点：" + (a >= 0.9 ? "言えた" : a >= 0.6 ? "ほぼ言えた" : "言えなかった")}</div></div><button class="btn primary" data-act="rp-next">${r.i + 1 < (pool("repeat").find(x => x.id === r.id) || {sentences:[]}).sentences.length ? "次の文へ" : "結果を見る"}</button>`;
+  const more = r.i + 1 < (pool("repeat").find(x => x.id === r.id) || {sentences:[]}).sentences.length;
+  return `<div class="exp">${d ? `<div class="diff">${d}</div>` : `<p class="script" style="background:transparent;padding:0">${esc(sent)}</p>`}<div class="small" style="margin-top:6px">${d ? "一致率 " + Math.round(a * 100) + "%（赤い語が抜け・違い）" : "自己採点：" + (a >= 0.9 ? "言えた" : a >= 0.6 ? "ほぼ言えた" : "言えなかった")}</div></div><button class="btn primary" data-act="rp-next">${more ? "次の文へ" : "結果を見る"}</button>${more ? mdoneBox(mdoneAt("repeat", r, r.i)) : ""}`;
 }
 function interviewHTML() {
   const P = pool("interview"); let set = P.find(x => x.id === UI.iv.id); if (!set) { set = P[0]; UI.iv = newIv(set.id); }
@@ -2513,7 +2552,7 @@ function interviewHTML() {
     const sc = v.scores.filter(x => x != null);
     return `<div class="card"><h2>Take an Interview</h2>${pills}${sc.length ? `<p class="result">AI評価の平均 <b>${(sc.reduce((a, c) => a + c, 0) / sc.length).toFixed(1)}</b> / 5</p>` : `<p class="result">${n}問終了</p>`}
       <div class="script">${set.questions.map((q, k) => `<p><b>Q${k + 1}</b>${esc(q)}${v.ans[k] ? `<br><span class="small muted">あなた：${esc(v.ans[k])}</span>` : ""}${v.scores[k] != null ? ` <span class="small"><b>${fbScore(v.scores[k]).toFixed(1)}</b></span>` : ""}</p>`).join("")}</div>
-      <div class="row"><button class="btn primary" data-act="iv-restart">もう一度</button></div></div>`;
+      ${mdoneLine(mdoneAt("interview", v))}<div class="row">${homeBtn(true)}<button class="btn" data-act="iv-restart">もう一度</button></div></div>`;
   }
   const q = set.questions[v.i];
   return `<div class="card">
@@ -2528,6 +2567,7 @@ function interviewHTML() {
     <textarea class="write sm" id="ivText" autocapitalize="sentences" autocorrect="off" spellcheck="false">${esc(v.ans[v.i] || "")}</textarea></label>
     <div class="row"><button class="btn ai-only" data-act="iv-grade">AIフィードバック</button><button class="btn ghost" data-act="iv-next">${v.i + 1 < n ? "次の質問" : "終了して結果を見る"}</button></div>
     <div id="ivFb" aria-live="polite"></div>
+    ${mdoneBox(mdoneAt("interview", v, v.i))}
   </div>`;
 }
 function speakingSub() { return UI.speaking === "repeat" ? repeatHTML() : interviewHTML(); }
@@ -2550,16 +2590,17 @@ function prepRv() {
 }
 function rvMark(ok) {
   const r = UI.rv, m = r.list[r.i]; r.ok = ok;
+  const snap = menuSnap("review");   /* before clearMiss: the review row's size counts the list */
   if (ok) { if (clearMiss(m.k, m.id, m.q)) r.fixed++; } else addMiss(m.k, m.id, m.q);
-  bump("review");
+  bump("review"); menuMark("review", snap, r, r.i);
 }
 function reviewHTML() {
   if (!UI.rv) newReview();
   const r = UI.rv;
-  if (!r.list.length) return `<div class="card"><h2>間違えた問題はありません</h2><p class="small">Reading・Listening の選択問題と Build a Sentence で間違えると、ここに自動で入ります。正解するとリストから外れます。</p><div class="row"><button class="btn" data-act="go" data-r="home">ホームへ</button></div></div>`;
+  if (!r.list.length) return `<div class="card"><h2>間違えた問題はありません</h2><p class="small">Reading・Listening の選択問題と Build a Sentence で間違えると、ここに自動で入ります。正解するとリストから外れます。</p><div class="row">${homeBtn(true)}</div></div>`;
   if (r.done) {
     const left = liveMiss().length;
-    return `<div class="card"><h2>復習おわり</h2><p class="result">リストから外れた問題 <b>${r.fixed}</b> / ${r.list.length}</p><p class="muted small">${left ? "リストに残っている問題：" + left + "問" : "リストは空になりました。"}</p><div class="row">${left ? `<button class="btn primary" data-act="rv-new">続けて復習</button>` : ""}<button class="btn ghost" data-act="go" data-r="home">ホームへ</button></div></div>`;
+    return `<div class="card"><h2>復習おわり</h2><p class="result">リストから外れた問題 <b>${r.fixed}</b> / ${r.list.length}</p><p class="muted small">${left ? "リストに残っている問題：" + left + "問" : "リストは空になりました。"}</p>${mdoneLine(mdoneAt("review", r))}<div class="row">${homeBtn(true)}${left ? `<button class="btn" data-act="rv-new">続けて復習</button>` : ""}</div></div>`;
   }
   const m = r.list[r.i], it = missItem(m);
   const top = `<div class="spread"><h2>${esc(TASKS[m.k].name)}</h2><span class="muted small">${r.i + 1} / ${r.list.length}</span></div>`;
@@ -2577,7 +2618,7 @@ function reviewHTML() {
   else if (m.k === "choose") task = (r.plays > 0 || r.reveal || !hasAudio() || answered) ? `<div class="q" style="border-top:0;padding-top:0">${optsHTML(q, r.ans, "rv-ans")}</div>` : `<p class="muted small">再生すると選択肢が表示されます。</p>`;
   else task = `<div class="q"><div class="qt">${esc(q.q)}</div>${optsHTML(q, r.ans, "rv-ans")}</div>`;
   const exp = answered && q ? `<div class="exp">${r.ans === q.a ? "<b>正解。</b>" : "<b>不正解。</b>正解は " + LET[q.a] + "。"}${esc(q.exp || "")}</div>` : "";
-  const status = answered ? `<p class="small${r.ok ? "" : " muted"}">${r.ok ? "リストから外しました。" : "リストに残ります。次の復習でもう一度出ます。"}</p>${next}` : "";
+  const status = answered ? `<p class="small${r.ok ? "" : " muted"}">${r.ok ? "リストから外しました。" : "リストに残ります。次の復習でもう一度出ます。"}</p>${next}${r.i + 1 < r.list.length ? mdoneBox(mdoneAt("review", r, r.i)) : ""}` : "";
   return `<div class="card">${top}${body}${task}${exp}${status}</div>`;
 }
 function reviewView() { view().innerHTML = head("review") + `<div id="sub">${reviewHTML()}</div>`; }
@@ -2749,7 +2790,7 @@ function render(keepScroll) {
   updateExamChip();
   if (!keepScroll) window.scrollTo(0, 0);
 }
-window.addEventListener("hashchange", () => render());
+window.addEventListener("hashchange", () => { UI.mdone = null; render(); });   /* the menu-row note belongs to the screen it was shown on */
 function subRender() {
   stopAll();
   const r = route();
@@ -2789,6 +2830,7 @@ const ACT = {
   "lsn-next"() { Lsn.next(); },
   "lsn-prev"() { Lsn.prev(); },
   exam() { UI.focusExam = true; if (route() === "home") render(true); else location.hash = "home"; },
+  home() { if (route() === "home") render(); else location.hash = "home"; },   /* 「ホームに戻る」; the router's stopAll() stops speech and timers */
   band(el) { const k = el.dataset.k, d = Number(el.dataset.d); let v = S.bands[k]; v = v == null ? (d > 0 ? 4.5 : 4) : v + d; S.bands[k] = Math.max(1, Math.min(6, v)); save(); render(true); },
   "bk-copy"() {
     const json = JSON.stringify(S);
@@ -2800,17 +2842,18 @@ const ACT = {
     const t = $("#bkIn"); if (!t || !t.value.trim()) { toast("バックアップを貼り付けてください"); return; }
     let o; try { o = JSON.parse(t.value.trim()); } catch (e) { toast("読み取れませんでした。コピーした文字列をそのまま貼り付けてください"); return; }
     if (!o || o.v !== 1) { toast("このアプリのバックアップではないようです"); return; }
-    S = merge(o); save(); UI.vq = null; UI.rv = null; UI.vundo = null; toast("復元しました"); render(true);
+    S = merge(o); save(); UI.vq = null; UI.rv = null; UI.vundo = null; UI.mdone = null; UI.mseen = []; toast("復元しました"); render(true);
   },
   reset(el) {
     if (el.dataset.armed !== "1") { el.dataset.armed = "1"; el.textContent = "本当に消去する（もう一度押す）"; el.classList.add("rec-on"); setTimeout(() => { if (el.isConnected) { el.dataset.armed = ""; el.textContent = "学習記録をすべて消去"; el.classList.remove("rec-on"); } }, 4000); return; }
-    const keep = {ai:S.ai, customVocab:S.customVocab, prefs:S.prefs, examDate:S.examDate}; S = fresh(); Object.assign(S, keep); save(); UI.vq = null; UI.rv = null; UI.vundo = null; toast("学習記録を消去しました（試験日とAIで作った問題は残しています）"); render(true);
+    const keep = {ai:S.ai, customVocab:S.customVocab, prefs:S.prefs, examDate:S.examDate}; S = fresh(); Object.assign(S, keep); save(); UI.vq = null; UI.rv = null; UI.vundo = null; UI.mdone = null; UI.mseen = []; toast("学習記録を消去しました（試験日とAIで作った問題は残しています）"); render(true);
   },
   /* vocab */
-  "v-show"() { UI.vshow = true; UI.vundo = null; renderCard(); if (S.prefs.vmode === "ja") vSay(); },
+  "v-show"() { UI.vshow = true; UI.vundo = null; UI.mdone = null; renderCard(); if (S.prefs.vmode === "ja") vSay(); },
   "v-grade"(el) {
     const g = Number(el.dataset.g), w = UI.vq[0]; const isNew = !S.vocab[w];
     if (g === 3 && !isNew) return;
+    const snap = menuSnap("vocab");
     UI.vq.shift(); const rec = S.vocab[w] || {b:0, due:0};
     UI.vundo = null;
     if (g === 3) { const kr = {b:6, due:Date.now() + KNOWN_DAYS * DAY, kn:1}; S.vocab[w] = kr; bump("vocab"); UI.vundo = {w, rec:kr, add:topUp()}; }
@@ -2820,11 +2863,13 @@ const ACT = {
       else { rec.b = Math.min(6, rec.b + 1); rec.due = Date.now() + INT[rec.b] * DAY; }
       S.vocab[w] = rec; if (isNew) bump("vnew"); bump("vocab");
     }
-    save(); UI.vshow = false; renderCard(); if (S.prefs.vmode !== "ja") vSay();
+    save(); UI.vshow = false; menuMark("vocab", snap, null, null); renderCard(); if (S.prefs.vmode !== "ja") vSay();   /* the note shows on the next card (or the Done card) */
   },
   "v-undo"() {
     const u = UI.vundo; UI.vundo = null; if (!u) return;
     if (S.vocab[u.w] === u.rec) {
+      const md = mdoneAt("vocab", null); if (md) UI.mseen = UI.mseen.filter(x => !md.some(r => r.key === x));   /* the row is open again: announce it when it is really done */
+      UI.mdone = null;
       delete S.vocab[u.w]; bump("vocab", -1);
       if (u.add && !S.vocab[u.add]) UI.vq = (UI.vq || []).filter(x => x !== u.add);
       UI.vq = (UI.vq || []).filter(x => x !== u.w); UI.vq.unshift(u.w);
@@ -2833,7 +2878,7 @@ const ACT = {
     } else renderCard();
   },
   "v-auto"() { S.prefs.vauto = !S.prefs.vauto; save(); vocabView(); },
-  "v-more"() { UI.vq = buildQueue(true); UI.vshow = false; renderCard(); },
+  "v-more"() { UI.vq = buildQueue(true); UI.vshow = false; UI.mdone = null; renderCard(); },
   "v-say"(el) { const it = findWord(UI.vq && UI.vq[0]); if (it) Speech.play([{sp:"A", text:it.w}]); },
   "v-say-ex"() { const it = findWord(UI.vq && UI.vq[0]); if (it && it.ex) Speech.play([{sp:"A", text:it.ex}]); },
   "v-ai"(el) {
@@ -2861,7 +2906,7 @@ const ACT = {
       const old = inp.parentNode.querySelector(".ans"); if (old) old.remove();
       if (!good) { const s = document.createElement("span"); s.className = "ans"; s.textContent = ans; inp.after(s); }
     });
-    $("#ctwRes").innerHTML = `<p class="result">結果 <b>${ok}</b> / ${b.blanks.length}</p><p class="muted small">間違えた語は赤字が正解。語形（複数形・時制）と前後の文法から推測するのがコツです。</p>`;
+    $("#ctwRes").innerHTML = `<p class="result">結果 <b>${ok}</b> / ${b.blanks.length}</p><p class="muted small">間違えた語は赤字が正解。語形（複数形・時制）と前後の文法から推測するのがコツです。</p><div class="row" style="margin-top:8px">${homeBtn(false)}</div>`;
     if (!UI.ctw.checked) { UI.ctw.checked = true; bump("ctw"); logResult("ctw", ok, b.blanks.length); }
   },
   "ctw-next"() { UI.ctw.i = (UI.ctw.i + 1) % pool("ctw").length; UI.ctw.built = null; subRender(); },
@@ -2879,10 +2924,12 @@ const ACT = {
     if (o === q.a) clearMiss(C.key, C.id, qi); else addMiss(C.key, C.id, qi);
     if (C.key !== "talk") bump(C.key); else save();
     if (C.ans.every(x => x != null) && !C.logged) {
-      C.logged = true; if (C.key === "talk") bump("talk"); const ok = C.ans.filter((x, i) => x === C.qs[i].a).length;
+      C.logged = true; let rows = null;
+      if (C.key === "talk") { const snap = menuSnap("talk"); bump("talk"); rows = menuDone("talk", snap); }   /* one talk = the end of the set and of its menu row */
+      const ok = C.ans.filter((x, i) => x === C.qs[i].a).length;
       const entry = {t:Date.now(), k:C.key, c:ok, n:C.qs.length}; if (C.key === "talk") entry.id = UI.tk.id;
       S.log.push(entry); if (S.log.length > 600) S.log = S.log.slice(-600); save();
-      const r = $("#mcqRes"); if (r) r.innerHTML = `結果 <b>${ok}</b> / ${C.qs.length}` + missNote(C.qs.length - ok);
+      const r = $("#mcqRes"); if (r) r.innerHTML = `結果 <b>${ok}</b> / ${C.qs.length}` + missNote(C.qs.length - ok) + mdoneLine(rows) + `<div class="row" style="margin-top:8px">${homeBtn(C.key === "talk")}</div>`;
       if (C.key === "talk") { const d = $("#tkScript"); if (d) d.open = true; }
     }
   },
@@ -2898,7 +2945,7 @@ const ACT = {
     if (first || r === "none") { if (route() === "listening" && UI.listening === "choose") rerenderSub(chooseHTML()); }
   },
   "ch-reveal"() { UI.ch.reveal = true; rerenderSub(chooseHTML()); },
-  "ch-ans"(el) { const c = UI.ch, it = c.items[c.i]; if (c.ans != null) return; c.ans = Number(el.dataset.o); if (c.ans === it.a) { c.correct++; clearMiss("choose", it.id); } else addMiss("choose", it.id); bump("choose"); Speech.stop(); rerenderSub(chooseHTML()); },
+  "ch-ans"(el) { const c = UI.ch, it = c.items[c.i]; if (c.ans != null) return; const snap = menuSnap("choose"); c.ans = Number(el.dataset.o); if (c.ans === it.a) { c.correct++; clearMiss("choose", it.id); } else addMiss("choose", it.id); bump("choose"); menuMark("choose", snap, c, c.i); Speech.stop(); rerenderSub(chooseHTML()); },
   "ch-next"() { const c = UI.ch; if (c.i + 1 < c.items.length) { c.i++; c.ans = null; c.plays = 0; c.reveal = false; } else { c.done = true; logResult("choose", c.correct, c.items.length); } rerenderSub(chooseHTML()); },
   "ch-new"() { newChooseSet(); rerenderSub(chooseHTML()); },
   "ch-ai"(el) { runAI(el, "genOut", async () => { const it = await generate("choose"); newChooseSet(it); rerenderSub(chooseHTML()); }); },
@@ -2921,7 +2968,7 @@ const ACT = {
     const [b, re] = basCtx(el), it = b.items[b.i]; if (b.res) return;
     const got = b.placed.map(k => b.tiles.find(x => x.k === k).t).join(" "); const ok = got === it.answer.join(" "); b.res = ok ? "ok" : "ng";
     if (el.dataset.ctx === "rv") rvMark(ok);
-    else { if (ok) { b.correct++; clearMiss("bas", it.id); } else addMiss("bas", it.id); bump("bas"); }
+    else { const snap = menuSnap("bas"); if (ok) { b.correct++; clearMiss("bas", it.id); } else addMiss("bas", it.id); bump("bas"); menuMark("bas", snap, b, b.i); }
     re();
   },
   "bas-next"() { const b = UI.bas; if (b.i + 1 < b.items.length) { b.i++; prepTiles(b); } else { b.done = true; Timer.stop(); logResult("bas", b.correct, b.items.length); } rerenderSub(basHTML()); },
@@ -2937,7 +2984,7 @@ const ACT = {
     el.textContent = "やり直す（タイマー再開）";
   },
   "w-unlock"() { const t = $("#wText"); if (t) { t.readOnly = false; t.focus(); } const s = $("#wSelf"); if (s) s.innerHTML = ""; },
-  "w-self"() { const k = UI.writing; const s = $("#wSelf"); if (!s) return; const ta = $("#wText"); if (ta && wcount(ta.value) >= 50 && !W_DONE.has(ta.dataset.id)) { W_DONE.add(ta.dataset.id); bump(k); } s.innerHTML = `<div class="card inset"><h3>提出前チェック</h3><ul class="checks">${CHECKS[k].map((c, i) => `<li><label><input type="checkbox" id="chk-${k}-${i}"> ${esc(c)}</label></li>`).join("")}</ul></div>`; },
+  "w-self"() { const k = UI.writing; const s = $("#wSelf"); if (!s) return; const ta = $("#wText"); if (ta && wcount(ta.value) >= 50 && !W_DONE.has(ta.dataset.id)) { W_DONE.add(ta.dataset.id); bump(k); } s.innerHTML = `<div class="card inset"><h3>提出前チェック</h3><ul class="checks">${CHECKS[k].map((c, i) => `<li><label><input type="checkbox" id="chk-${k}-${i}"> ${esc(c)}</label></li>`).join("")}</ul></div>`; wHome(); },
   "w-grade"(el) {
     const k = el.dataset.k, ta = $("#wText"); const text = ta.value.trim();
     if (wcount(text) < 25) { toast("25語以上書いてから採点しましょう"); return; }
@@ -2950,6 +2997,7 @@ const ACT = {
       S.history.push({t:Date.now(), k, title:it.title, score:fbScore(f.score), summary:String(f.summary || "").slice(0, 300), words:wcount(text)});
       if (S.history.length > 30) S.history = S.history.slice(-30);
       if (!W_DONE.has(it.id)) { W_DONE.add(it.id); bump(k); } logScore(k, fbScore(f.score));
+      wHome();
     });
   },
   "w-ai"(el) { const k = el.dataset.k; runAI(el, "genOut", async () => { const it = await generate(k); if (k === "email") UI.em = it[0].id; else UI.dc = it[0].id; subRender(); }); },
@@ -2976,10 +3024,11 @@ const ACT = {
   "rp-check"() {
     const set = pool("repeat").find(x => x.id === UI.rp.id); const sent = set.sentences[UI.rp.i]; const inp = $("#rpIn");
     if (!inp || !inp.value.trim()) { toast("入力が空です。自己採点もできます"); return; }
-    const d = diffWords(sent, inp.value); UI.rp.res[UI.rp.i] = d.acc; UI.rp.lastDiff = d.html; bump("repeat"); rerenderSub(repeatHTML());
+    const snap = menuSnap("repeat");
+    const d = diffWords(sent, inp.value); UI.rp.res[UI.rp.i] = d.acc; UI.rp.lastDiff = d.html; bump("repeat"); menuMark("repeat", snap, UI.rp, UI.rp.i); rerenderSub(repeatHTML());
   },
   "rp-self"() { const r = $("#rpRes"); const set = pool("repeat").find(x => x.id === UI.rp.id); r.innerHTML = `<div class="exp"><p class="script" style="background:transparent;padding:0">${esc(set.sentences[UI.rp.i])}</p><div class="row" style="margin-top:8px"><button class="btn sm" data-act="rp-rate" data-v="1">言えた</button><button class="btn sm" data-act="rp-rate" data-v="0.7">ほぼ言えた</button><button class="btn sm ghost" data-act="rp-rate" data-v="0.3">言えなかった</button></div></div>`; },
-  "rp-rate"(el) { UI.rp.res[UI.rp.i] = Number(el.dataset.v); UI.rp.lastDiff = null; bump("repeat"); rerenderSub(repeatHTML()); },
+  "rp-rate"(el) { const snap = menuSnap("repeat"); UI.rp.res[UI.rp.i] = Number(el.dataset.v); UI.rp.lastDiff = null; bump("repeat"); menuMark("repeat", snap, UI.rp, UI.rp.i); rerenderSub(repeatHTML()); },
   "rp-next"() { const set = pool("repeat").find(x => x.id === UI.rp.id); const r = UI.rp; if (r.i + 1 < set.sentences.length) { r.i++; r.played = false; r.shown = false; r.lastDiff = null; } else { r.done = true; logResult("repeat", r.res.filter(x => x >= 0.9).length, set.sentences.length); } rerenderSub(repeatHTML()); },
   "rp-restart"() { UI.rp = {id:UI.rp.id, i:0, res:[], played:false, shown:false, done:false}; rerenderSub(repeatHTML()); },
   /* speaking: interview */
@@ -3013,8 +3062,10 @@ const ACT = {
   "iv-next"() {
     const set = pool("interview").find(x => x.id === UI.iv.id); const v = UI.iv; const ta = $("#ivText");
     if (ta) v.ans[v.i] = ta.value.trim();
+    const snap = menuSnap("interview");
     if (v.went || v.ans[v.i]) bump("interview");   /* skipping a question does not count toward today's menu */
     if (v.i + 1 < set.questions.length) { v.i++; v.played = false; v.went = false; } else v.done = true;
+    menuMark("interview", snap, v, v.i);   /* counted on 次の質問, so the note shows on the next question (or the end screen) */
     subRender();
   },
   "iv-restart"() { UI.iv = newIv(UI.iv.id); subRender(); },
@@ -3140,7 +3191,7 @@ document.addEventListener("visibilitychange", () => {
   if (UI.lsnHid) { UI.lsnHid = false; if (Lsn.state === "paused") { Lsn.msg = "画面が消えたので一時停止しました。▶ で続きから"; Lsn.paint(); } }
   if (Timer.id || Speech.playing) Wake.on();
   if (UI.lastDay !== today()) {
-    UI.lastDay = today(); UI.vq = null; UI.sess = null; UI.vundo = null;
+    UI.lastDay = today(); UI.vq = null; UI.sess = null; UI.vundo = null; UI.mdone = null; UI.mseen = [];
     const r = route(); if (r === "home" || r === "vocab" || r === "record") render(true);
   }
 });
