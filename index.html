@@ -260,6 +260,11 @@ details summary{cursor:pointer;font-weight:700;font-size:14px}
 .result b{font-family:var(--f-display);font-size:30px;font-weight:600}
 .ctx{border:1px solid var(--line);border-radius:8px;padding:10px 12px}
 .ctx[open] summary{margin-bottom:10px}
+/* the whole box of a folded section takes the tap, not just the line of text (walking, one hand) */
+.ctx>summary{position:relative}
+.ctx>summary::after{content:"";position:absolute;top:-10px;bottom:-10px;left:-12px;right:-12px}
+/* after an answer the translations push 次へ down; showNext() scrolls it back above the bottom tabs */
+[data-act=ch-next],[data-act=bas-next],[data-act=rv-next]{scroll-margin:12px 0 calc(90px + var(--sab))}
 .ctx .passage{font-size:16px;line-height:1.85}
 
 /* listening */
@@ -360,6 +365,21 @@ select{border:1px solid var(--line);border-radius:8px;padding:8px 10px;backgroun
 textarea.backup{width:100%;min-height:110px;border:1px solid var(--line);border-radius:8px;padding:10px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:var(--card)}
 #toast{position:fixed;left:50%;bottom:calc(86px + var(--sab));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:8px 14px;border-radius:8px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw;text-align:center;z-index:9}
 #toast.on{opacity:1}
+/* translations and notes (trOf): in the page only after the answer. .tr = one line under its English (.note = an explanation, in ink),
+   .trx = a longer Japanese text, .trw = the blanked words of Complete the Words. A <br> right after a .tr line would leave an empty line.
+   Kept after the task styles so that these win where both apply (.card p, .fb ul) */
+.tr{display:block;font-family:var(--f-ui);font-size:12.5px;line-height:1.55;font-weight:400;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
+.tr.note{font-size:13px;line-height:1.6;color:var(--ink);margin-top:6px}
+.tr+br{display:none}
+.trx{font-family:var(--f-ui);font-size:14px;line-height:1.75;font-weight:400;white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
+.trx p{margin:0 0 8px}
+.trx ul{margin:0;padding-left:1.2em;font-size:inherit}
+.trx p:last-child{margin:0}
+ul.trw{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:2px;font-size:inherit}
+.trw li{margin:0}
+.trw b{font-family:var(--f-text);font-size:15px;font-weight:600}
+.result .ctx{margin-top:8px}
+#ivTr:empty,#wTr:empty{display:none}   /* empty slots take no gap in the card, so the screen before the answer is laid out as before */
 @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -1268,7 +1288,7 @@ const DAILY = [
  {q:"What is the main purpose of the notice?",opts:["To inform students about temporary changes to library services","To announce that new study rooms have opened permanently","To ask students to help move books during the renovation","To explain why the library needs to be renovated"],a:0,exp:"閉鎖・時間短縮・代替手段など「一時的な変更」を知らせる告知。改装の理由は書かれていない。"},
  {q:"How can a student get a book that is shelved on the third floor?",opts:["By going to the third floor before 10:00 a.m.","By requesting it at the reference desk and picking it up later","By reserving it online at the Student Center","By waiting until the renovation is finished"],a:1,exp:"最終文：閉鎖フロアの本は reference desk で依頼でき、24時間以内に受け取れる。"},
  {q:"What can be inferred about the computer lab?",opts:["It will be closed on weekends.","It is located on the first floor.","It will move to the Student Center.","It is open 24 hours a day."],a:1,exp:"「The first floor, including the reference desk and computer lab」から、1階にあると分かる。週末も短縮営業で開いている。"}]},
-{id:"d2",kind:"Email",title:"Change to Thursday's lab session",body:"From: Dr. Alvarez\nTo: CHEM 210 students\n\nHi everyone,\n\nBecause the chemistry building will be without power on Thursday morning, our lab session will move to Friday at 2:00 p.m. in the same room. If you have a class conflict on Friday afternoon, please reply to this email by Wednesday noon so I can arrange an alternative time. The pre-lab quiz will now be due Thursday at midnight instead of Wednesday. Please bring your safety goggles as usual.\n\nBest,\nDr. Alvarez",questions:[
+{id:"d2",kind:"Email",title:"Change to Thursday's lab session",body:"From: Dr. Alvarez\nTo: CHEM 210 students\n\nHi everyone,\n\nBecause the chemistry building will be without power on Thursday morning, our lab session will move to Friday at 2:00 p.m. in the same room. If you have a class conflict on Friday afternoon, please reply to this email by Wednesday noon so I can arrange an alternative time. The pre-lab quiz will now be due Thursday at 11:59 p.m. instead of Wednesday. Please bring your safety goggles as usual.\n\nBest,\nDr. Alvarez",questions:[
  {q:"Why is the lab session being moved?",opts:["The professor will be away on Thursday.","The building will have no electricity on Thursday morning.","The lab room is needed for another class.","Students asked for a later time."],a:1,exp:"「without power」＝電気が止まる。"},
  {q:"What should a student who has another class on Friday afternoon do?",opts:["Attend the lab on Thursday as planned","Take the pre-lab quiz early","Reply to Dr. Alvarez by Wednesday noon","Go to the chemistry office on Friday morning"],a:2,exp:"「please reply to this email by Wednesday noon」。"},
  {q:"What is true about the pre-lab quiz?",opts:["It has been canceled.","Its deadline is now one day later.","It must be taken in the lab room.","It will be given on Friday."],a:1,exp:"水曜締切 → 木曜深夜締切。1日延びた。"}]},
@@ -1284,7 +1304,7 @@ const DAILY = [
 const ACAD = [
 {id:"a1",title:"The Domestication of the Horse",paragraphs:[
 "For most of human history, horses were hunted for meat rather than ridden. Archaeological evidence suggests that the domestication of the horse began on the grasslands of Central Asia, known as the steppe, roughly 5,500 years ago. At a site called Botai in present-day Kazakhstan, researchers discovered thousands of horse bones along with traces of mare's milk on ancient pottery, which indicates that people were keeping horses rather than simply hunting them.",
-"However, genetic studies have complicated this picture. When scientists analyzed DNA from the Botai horses, they found that these animals were not the ancestors of modern domestic horses. Instead, they were more closely related to Przewalski's horse, a population that still survives in Mongolia. Modern domestic horses appear to descend from a different population that spread rapidly across Eurasia about 4,200 years ago.",
+"However, genetic studies have complicated this picture. When scientists analyzed DNA from the Botai horses, they found that these animals were not the ancestors of modern domestic horses. Instead, they were more closely related to Przewalski's horse, which died out in the wild but has since been reintroduced to Mongolia. Modern domestic horses appear to descend from a different population that spread rapidly across Eurasia about 4,200 years ago.",
 "The spread of this lineage had profound consequences. Horses allowed people to travel much greater distances, transport goods, and communicate across vast regions. They also transformed warfare, as mounted fighters and horse-drawn chariots gave some societies a decisive military advantage. Some historians argue that the movement of horse-riding peoples helped spread languages and technologies throughout Europe and Asia.",
 "Despite these advances, many questions remain. Bones rarely reveal whether a horse was ridden, and early riders may not have used equipment that would survive in the archaeological record. Consequently, the precise moment when humans first climbed onto a horse's back may never be known."],
 questions:[
@@ -1347,33 +1367,33 @@ const TALKS = [
  questions:[
  {q:"What is the lecture mainly about?",opts:["How fireflies communicate on summer evenings","Reasons why some organisms produce light","The structure of the deep sea","How squid escape from predators"],a:1,exp:"生物発光の「理由」（捕食・防御・コミュニケーション）が主題。ホタルやイカは例。"},
  {q:"Why does the professor mention the anglerfish?",opts:["To show that some fish cannot see","To illustrate how light can help an animal catch prey","To compare deep-sea fish with fireflies","To explain why bioluminescence is rare"],a:1,exp:"光るルアーで獲物をおびき寄せる＝捕食の例。"},
- {q:"What does the professor imply by saying that bioluminescence evolved independently many times?",opts:["It must be a very useful adaptation.","It first appeared in fireflies.","Scientists disagree about its origin.","It is found only in the ocean."],a:0,exp:"何度も独立に進化した → 有用な適応だということ。"}]},
+ {q:"What does the professor conclude from the fact that bioluminescence has evolved independently many times?",opts:["It must be a very useful adaptation.","It first appeared in fireflies.","Scientists disagree about its origin.","It is found only in the ocean."],a:0,exp:"何度も独立に進化した → 有用な適応だということ。"}]},
 {id:"t4",type:"lecture",title:"心理学：分散学習の効果",lines:[
  {sp:"Professor",text:"Let's turn to something that's directly relevant to all of you as students: the spacing effect. This is the finding that information is remembered better when study sessions are spread out over time, rather than crammed into a single session."},
  {sp:"Professor",text:"The effect was first described in the 1880s by the German psychologist Hermann Ebbinghaus, who tested his own memory using lists of nonsense syllables. He found that he needed fewer total repetitions to learn a list when he spread his practice over several days. Since then, the spacing effect has been confirmed in hundreds of studies, with all kinds of material: vocabulary, math, even motor skills."},
  {sp:"Professor",text:"Now, why does it work? One explanation is that when you return to material after a delay, you have to work a little harder to retrieve it, and that effort strengthens the memory. So if cramming the night before an exam feels productive, well, it may help you the next morning, but you'll probably forget most of it within a week."}],
  questions:[
  {q:"What is the main topic of the talk?",opts:["The history of German psychology","A way of studying that improves long-term memory","Why nonsense syllables are hard to learn","How motor skills differ from vocabulary"],a:1,exp:"分散学習（spacing effect）が主題。"},
- {q:"According to the professor, what did Ebbinghaus find?",opts:["He forgot lists faster when he studied every day.","He needed fewer repetitions when he spread practice over several days.","Cramming was the most efficient method.","Meaningful words were easier than nonsense syllables."],a:1,exp:"「needed fewer total repetitions ... when he spread his practice over several days」。"},
+ {q:"According to the professor, what did Ebbinghaus find?",opts:["He forgot lists faster when he studied every day.","He needed fewer repetitions when he spread practice over several days.","Cramming was the most efficient method.","Nonsense syllables were easier to remember than real words."],a:1,exp:"「needed fewer total repetitions ... when he spread his practice over several days」。"},
  {q:"What is the professor's opinion of cramming?",opts:["It is the best way to prepare for exams.","It may help briefly but is poor for long-term retention.","It works well for motor skills.","It has never been studied."],a:1,exp:"翌朝には役立つかもしれないが、1週間でほとんど忘れると述べている。"}]}
 ];
 
 const BAS = [
-{id:"b1",ctx:"Did you finish the reading for tomorrow's seminar?",pre:"No, I",answer:["haven't had","a chance","to start","it","yet"],post:".",extra:"since"},
+{id:"b1",ctx:"Did you finish the reading for tomorrow's seminar?",pre:"No, I",answer:["haven't","had","a chance","to start","it yet"],post:".",extra:"since"},
 {id:"b2",ctx:"Did you find the book for your literature essay?",pre:"Not yet. The book",answer:["that","the professor","recommended","is","already checked out"],post:".",extra:"who"},
-{id:"b3",ctx:"Why was the field trip canceled?",pre:"Apparently,",answer:["the bus company","could not","provide","enough drivers","on such","short notice"],post:".",extra:null},
-{id:"b4",ctx:"Can you tell me where the registrar's office is?",pre:"Sorry, I",answer:["don't know","where","it","is","either"],post:".",extra:"does"},
+{id:"b3",ctx:"Why was the field trip canceled?",pre:"Apparently,",answer:["the bus company","could not","provide","enough drivers","on such","short"],post:" notice.",extra:null},
+{id:"b4",ctx:"Can you tell me where the registrar's office is?",pre:"Sorry, I",answer:["don't","know","where","it","is either"],post:".",extra:"does"},
 {id:"b5",ctx:"How was the guest lecture yesterday?",pre:"It was",answer:["one of","the most","interesting talks","I have","ever attended"],post:".",extra:"more"},
 {id:"b6",ctx:"Are you going to the conference in April?",pre:"I would",answer:["if","I had","enough money","to pay for","the trip"],post:".",extra:"will"},
-{id:"b7",ctx:"What did your advisor tell you?",pre:"She suggested",answer:["that","I","take","the statistics course","next semester"],post:".",extra:"to"},
-{id:"b8",ctx:"Have you started your research paper?",pre:"Yes,",answer:["I've","been working","on it","since","last Monday"],post:".",extra:"for"},
-{id:"b9",ctx:"Is the new dormitory finished?",pre:"Not yet.",answer:["It is","expected","to be completed","by","next spring"],post:".",extra:"completing"},
-{id:"b10",ctx:"Why are you so tired today?",pre:"I",answer:["stayed up","late","finishing","the lab report","that was due","this morning"],post:".",extra:"finish"},
-{id:"b11",ctx:"Do you think the library will be crowded?",pre:"Probably.",answer:["It","tends to","get busy","right before","final exams"],post:".",extra:"tending"},
-{id:"b12",ctx:"Did the professor accept your late assignment?",pre:"Yes, she said",answer:["she would","accept it","as long as","I submit it","by Friday"],post:".",extra:"unless"},
-{id:"b13",ctx:"What's the best way to get to the stadium?",pre:"",answer:["The easiest way","is","to take","the shuttle","that leaves","from the main gate"],post:".",extra:"taking"},
-{id:"b14",ctx:"Have you heard if the exam has been rescheduled?",pre:"I'm not sure",answer:["whether","the exam","has been","moved","or not"],post:".",extra:"does"},
-{id:"b15",ctx:"Why did you choose this university?",pre:"",answer:["What","attracted me","most","was","its strong","engineering program"],post:".",extra:"Which"}
+{id:"b7",ctx:"What did your advisor tell you?",pre:"She suggested",answer:["that I","take the","statistics","course","next semester"],post:".",extra:"to"},
+{id:"b8",ctx:"Have you started your research paper?",pre:"Yes, I've",answer:["been","working on","it","since","last Monday"],post:".",extra:"for"},
+{id:"b9",ctx:"Is the new dormitory finished?",pre:"Not yet. It",answer:["is","expected to","be completed","by","next spring"],post:".",extra:"completing"},
+{id:"b10",ctx:"Why are you so tired today?",pre:"I",answer:["stayed up late","finishing","the lab report","that was","due this morning"],post:".",extra:"finish"},
+{id:"b11",ctx:"Do you think the library will be crowded?",pre:"Probably. It",answer:["tends to","get","busy","right before","final exams"],post:".",extra:"tending"},
+{id:"b12",ctx:"Did the professor accept your late assignment?",pre:"Yes, she said she",answer:["would","accept it","as long as","I submit","it by Friday"],post:".",extra:"unless"},
+{id:"b13",ctx:"What's the best way to get to the stadium?",pre:"",answer:["The easiest way","is to take","the shuttle","that","leaves from","the main gate"],post:".",extra:"leave"},
+{id:"b14",ctx:"Have you heard if the exam has been rescheduled?",pre:"I'm not sure",answer:["whether","the exam","has","been","moved or not"],post:".",extra:"does"},
+{id:"b15",ctx:"Why did you choose this university?",pre:"",answer:["What","attracted me most","was","its","strong","engineering program"],post:".",extra:"Which"}
 ];
 
 const EMAILS = [
@@ -1388,7 +1408,7 @@ const DISCS = [
  {name:"Kenji",text:"I think recording lectures is a great idea. Many students have part-time jobs or family responsibilities, and sometimes they simply can't make it to class. Recordings also let students review difficult parts of a lecture before an exam."},
  {name:"Sofia",text:"I disagree. If lectures are always available online, a lot of students will put off watching them and fall behind. Being in the classroom also lets you ask questions and discuss ideas with classmates, which you can't do with a video."}]},
 {id:"g2",title:"公共交通の無料化 vs 自転車道",course:"Urban Studies",profName:"Dr. Chen",prof:"Many cities are looking for ways to reduce traffic and air pollution. One proposal is to make public transportation completely free. Another is to spend the same money building more bike lanes and car-free streets. Which approach do you think would be more effective in reducing traffic in cities, and why?",students:[
- {name:"Ana",text:"Free public transportation would be more effective. Cost is one of the main reasons people choose to drive, especially in families with lower incomes. If buses and trains were free, many people would leave their cars at home."},
+ {name:"Ana",text:"Free public transportation would be more effective. The cost of fares is one of the main reasons people choose to drive instead, especially in families with lower incomes. If buses and trains were free, many people would leave their cars at home."},
  {name:"Marcus",text:"I'd choose bike lanes. In my city, the buses are already crowded and slow, so making them free wouldn't make them more attractive. Safe bike lanes would give people a fast, healthy alternative, at least for short trips."}]},
 {id:"g3",title:"リモートワークは企業に有益か",course:"Business",profName:"Dr. Lindqvist",prof:"Many companies now allow employees to work from home several days a week. Some managers believe this improves productivity and job satisfaction, while others argue that working in the same office is essential for teamwork and creativity. In your opinion, is remote work good for companies in the long run? Explain your reasoning.",students:[
  {name:"Lena",text:"I believe remote work benefits companies. Employees save time on commuting, so they're less tired and can focus better. Companies can also hire talented people who live far away."},
@@ -1396,7 +1416,7 @@ const DISCS = [
 ];
 
 const REPEAT = [
-{id:"r1",title:"図書館の案内",sentences:["Welcome to the library.","The front desk is on your left.","You can borrow up to ten books at a time.","Study rooms can be reserved online up to one week in advance.","If you need help finding a source, please ask one of the librarians.","Books that are returned after the due date will be charged a small daily fee.","Students who want to use the printers on the second floor should bring their ID cards."]},
+{id:"r1",title:"図書館の案内",sentences:["Welcome to the library.","The front desk is on your left.","You can borrow up to ten books at a time.","Study rooms can be reserved online up to one week in advance.","If you need help finding a source, please ask one of the librarians.","You will be charged a small daily fee for books returned after the due date.","Students who want to use the printers on the second floor should bring their ID cards."]},
 {id:"r2",title:"新入生オリエンテーション",sentences:["Good morning, everyone.","Please take a seat anywhere.","Today's tour will last about an hour.","We'll start at the student center and then visit the dining hall.","Make sure you pick up your schedule before the end of the day.","The sports center is open to all students, but you have to register first.","If you have any questions after the tour, feel free to stop by the information desk."]},
 {id:"r3",title:"実験室の注意事項",sentences:["Please put on your goggles.","Don't eat or drink in the lab.","Keep the aisles clear at all times.","Wash your hands before you leave the laboratory.","Always read the instructions carefully before starting an experiment.","If any chemical touches your skin, rinse it with water right away.","Your lab report should include your results as well as a short discussion of possible errors."]}
 ];
@@ -1406,6 +1426,74 @@ const INTERVIEW = [
 {id:"i2",topic:"スマートフォンの使い方",questions:["We're researching how people use their smartphones. How do you usually use your phone during a typical day?","Is there an app that you find especially useful? Tell me about it.","Have you ever tried to reduce the time you spend on your phone? What happened?","Should schools ban smartphones in classrooms? Why or why not?"]},
 {id:"i3",topic:"住む場所",questions:["We're studying how people choose places to live. Can you describe the town or city where you live now?","What do you like most about the area where you live?","Tell me about a place you have visited where you would like to live someday.","Do you think it's better for young people to live in big cities or in smaller towns? Explain your opinion."]}
 ];
+
+/* Japanese translations and notes for the items above, keyed by item id; read through trOf() and shown only after the answer.
+   One item per line, between the two markers (the block is replaced as a whole). Arrays follow the item's own order and length:
+   ctw {text, words[10] (the blanks of buildCTest, in order)} / daily {body, qs:[{q, opts[4]}]} / academic {paragraphs[], qs} / choose {say, opts[4]}
+   talk {lines[], qs} / bas {ctx, ans, exp} / email {scenario, bullets[3], tips, model, modelJa} / disc {prof, students[2], tips, model, modelJa}
+   repeat {sentences[7]} / interview {questions[4], tips[4], model[4], modelJa[4]}. model = a sample answer in English. An AI-made item carries the same shape in its own `ja`. */
+/* TRANS:BEGIN */
+const TRANS = {
+"c1":{"text":"多くの砂漠の植物は、雨の降らない長い期間を生き延びるための、驚くべき戦略を発達させてきた。水を太く多肉質の茎に蓄える種もあれば、地下の水源に届くことのできる深い根を伸ばす種もある。また、かなりの数の植物は、気孔を夜にだけ開く。夜は気温が低いので、蒸発によって失われる水の量が少なくなる。こうした適応のおかげで、それらの植物は、ほかの植物のほとんどがすぐに枯れてしまうような環境でもよく育つことができる。","words":["（生物の）種","水","太い、厚い","茎","ほかのもの（別の種）","深い","（関係代名詞）","届く","源（ここでは水源）","〜の（かなりの数の）"]},
+"c2":{"text":"15世紀の印刷機の発明は、ヨーロッパ全体に情報が広まる仕方を一変させた。それ以前は、本は手で書き写されており、そのために本は希少で高価だった。印刷された本は素早く、しかも大量に作ることができたので、より多くの人々が書かれた知識を手にできるようになった。その結果、識字率は少しずつ上がり、新しい考えはかつてないほど速く広まった。","words":["この（それ以前は）","本","書き写された","手（手で）","〜にした（希少にした）","希少な","高価な","本","（受け身）〜される","素早く"]},
+"c3":{"text":"氷河とは、自らの重みで陸地の上をゆっくりと移動する、巨大な氷の塊である。氷河は前進しながら、その下の地面を削り、岩や土を長い距離にわたって運ぶ。気候が暖かくなって氷が解けると、これらの物質は、モレーンと呼ばれる大きな山となって後に残される。地質学者は、古代の氷床の広がりを復元するために、こうした堆積物を研究する。","words":["それら（氷河）は","それら（氷河）は","（定冠詞）その","〜の下の","そして","岩","土","長い、大きな（長い距離）","〜するとき","気候"]},
+"c4":{"text":"研究者たちは長い間、人が日常の出来事の記憶をどのように形成するのかに関心を寄せてきた。研究は、記憶が写真のように保存されるのではなく、思い出されるたびに作り直されることを示唆している。この過程で、細部は、本人が気づかないうちに、失われたり、変えられたり、さらには付け加えられたりすることがある。このことから、二人の目撃者が同じ出来事をまったく異なる形で語ることがある理由がわかる。","words":["示唆する","記憶","〜ではなく","〜のように","そうではなく","作り直される","回、度（〜するたびに）","（受け身）〜される","〜の間に","過程"]},
+"c5":{"text":"天文学者は、私たちの銀河にあるほとんどの恒星には、その周りを回る惑星が少なくとも1つあると推定している。こうした遠く離れた世界を見つけるのは難しい。それらは小さく、自分では光を出さないからだ。よく使われる方法の1つは、惑星が恒星の前を通過するときに、恒星がわずかに暗くなるのを測定することだ。こうした変化を分析することで、科学者は惑星の大きさと公転周期を計算できる。","words":["これらの","世界（ここでは惑星）","難しい","それら（惑星）は","小さい","（否定の助動詞）","生み出す","自分自身の","1つの","方法"]},
+"c6":{"text":"都市は、交易にとって自然の利点がある場所の周りに発展することが多い。風や波から守られた港、船が航行できる川、あるいは主要な道どうしが交わる交差点は、商人や労働者を引き寄せることがある。いったん市場ができると、事業者は、より多くの客を相手にできるよう、その近くに集まる傾向がある。やがて、こうした活動の集中が、さらなる成長を支える道路や銀行、その他のサービスの発達を促す。","words":["港","川","交差点","主要な","〜しうる","商人","労働者","市場","確立される、できあがる","〜する傾向がある"]},
+"c7":{"text":"サンゴ礁は、地球上で最も多様な生態系の1つである。サンゴ礁は、炭酸カルシウムでできた硬い骨格を作る、小さな動物によって築かれている。これらの構造は、何千種もの魚やほかの海洋生物に、すみかと食べ物を与えている。しかし、サンゴ礁は水温の変化にとても敏感で、わずかな上昇でさえ、サンゴが頼りにしている藻類を失う原因になりうる。","words":["（受け身）〜される","〜によって","動物","作り出す","骨格","カルシウム（炭酸カルシウム）","これらの","与える","〜と","〜に、〜のために"]},
+"c8":{"text":"言語は、たとえその変化が一人の一生のうちには気づきにくいとしても、絶えず変化している。新しい技術を言い表すために新しい語が言語に入ってくる一方で、古い語は使われなくなることがある。若い話し手が異なる習慣を取り入れるにつれて、発音もまた徐々に変わりうる。言語学者は、こうしたパターンをたどり、言語がどのように発達するかを理解するために、異なる時代の書かれた記録を比べる。","words":["語","言語","言い表す","技術","より古い","〜することがある","外へ（使われなくなる）","使用（使われなくなる）","〜しうる","変わる"]},
+"d1":{"body":"3月3日から3月28日まで、ハートリー図書館の2階と3階は改装のため閉鎖される。レファレンスデスクとコンピューター室を含む1階は、平日の午前8時から午後10時まで、引き続き開館する。週末の開館時間は、午前10時から午後6時までに短縮される。\n\nグループ学習室は、学生センターの214号室で一時的に利用でき、オンラインで予約できる。閉鎖される階の書架にある本は、レファレンスデスクで請求でき、24時間以内に受け取れるよう用意される。","qs":[{"q":"この告知の主な目的は何か。","opts":["図書館のサービスの一時的な変更を学生に知らせること","新しい学習室が常設で開設されたことを告知すること","改装中に本の移動を手伝うよう学生に頼むこと","図書館を改装する必要がある理由を説明すること"]},{"q":"3階の書架にある本を、学生はどうすれば手に入れられるか。","opts":["午前10時より前に3階へ行く","レファレンスデスクで請求し、後で受け取る","学生センターでオンラインで予約する","改装が終わるまで待つ"]},{"q":"コンピューター室について推測できることは何か。","opts":["週末は閉まる。","1階にある。","学生センターに移る。","24時間開いている。"]}]},
+"d2":{"body":"差出人：アルバレス博士\n宛先：CHEM 210 の受講生\n\nみなさん、こんにちは。\n\n木曜日の朝は化学棟が停電になるため、実験の授業は金曜日の午後2時に移ります。教室は同じです。金曜日の午後にほかの授業と重なる人は、別の時間を手配できるよう、水曜日の正午までにこのメールに返信してください。実験前の小テストの締め切りは、水曜日ではなく木曜日の午後11時59分に変わります。安全ゴーグルは、いつもどおり持ってきてください。\n\nよろしくお願いします。\nアルバレス博士","qs":[{"q":"実験の授業が移されるのはなぜか。","opts":["教授が木曜日に不在になるから。","木曜日の朝、建物の電気が使えなくなるから。","実験室がほかの授業で必要になるから。","学生がもっと遅い時間を希望したから。"]},{"q":"金曜日の午後にほかの授業がある学生は、何をすべきか。","opts":["予定どおり木曜日の実験に出る","実験前の小テストを早めに受ける","水曜日の正午までにアルバレス博士に返信する","金曜日の朝に化学科の事務室へ行く"]},{"q":"実験前の小テストについて正しいものはどれか。","opts":["中止になった。","締め切りが1日遅くなった。","実験室で受けなければならない。","金曜日に実施される。"]}]},
+"d3":{"body":"大学ライティングセンターでは、秋学期のピアチューターを募集している。チューターは、アイデア出しから最終稿の推敲まで、書く過程のあらゆる段階で学生を手助けする。\n\n応募者は、英作文IIをB以上の成績で修了しており、かつ週に少なくとも8時間勤務できなければならない。チューターの経験があれば役に立つが、必須ではない。新しいチューターは全員、学期が始まる前に、有給の2日間の研修に参加する。\n\n応募するには、短い文章のサンプルと勤務可能な時間の一覧を、7月15日までにキャリアポータルから提出すること。","qs":[{"q":"記載された条件をすべて満たす応募者はどれか。","opts":["英作文IIでCを取り、週12時間働ける学生","英作文IIでB+を取り、週10時間働ける学生","チューターの経験はあるが、英作文IIを履修していない学生","英作文IでAを取り、週8時間働ける学生"]},{"q":"研修について述べられていることは何か。","opts":["経験のあるチューターは参加しなくてもよい。","学期が始まった後に行われる。","新しいチューターは給与を受けて参加する。","オンラインで行われる。"]},{"q":"募集文中の「stages」に最も意味が近いのはどれか。","opts":["演壇、台","段階、局面","上演、出来ばえ","成績、等級"]}]},
+"d4":{"body":"月曜日から、ブルーラインのシャトルバスは、午前7時から午前10時までの間、30分ごとではなく15分ごとに運行する。この変更は、朝のラッシュ時にバスが混雑しているという学生の意見に応えたものである。午前10時以降は、引き続き通常の時刻表で運行する。\n\n北側の駐車場を結ぶグリーンラインには影響がない。利用者は、CampusGo アプリを使って、バスの位置をリアルタイムで確認できる。","qs":[{"q":"ブルーラインの時刻表が変わるのはなぜか。","opts":["燃料費を節約するため","朝のバスが混みすぎていると学生が言ったから","新しい駐車場ができるから","グリーンラインの時刻表に合わせるため"]},{"q":"グリーンラインについて正しいものはどれか。","opts":["15分ごとに運行する。","北側の駐車場への運行をやめる。","時刻表は変わらない。","アプリで位置を確認できなくなる。"]}]},
+"a1":{"paragraphs":["人類の歴史の大部分において、馬は乗るものではなく、肉を得るために狩るものだった。考古学的な証拠は、馬の家畜化が、およそ5,500年前に、ステップとして知られる中央アジアの草原で始まったことを示唆している。現在のカザフスタンにあるボタイと呼ばれる遺跡で、研究者たちは何千もの馬の骨とともに、古代の土器に残った雌馬の乳の痕跡を発見した。これは、人々が馬を単に狩るのではなく、飼っていたことを示している。","しかし、遺伝学的な研究によって、この見方はより複雑なものになった。科学者たちがボタイの馬のDNAを分析したところ、これらの動物は現代の家畜馬の祖先ではないことがわかった。そうではなく、それらは、野生では一度絶滅したが、その後モンゴルに再導入されたモウコノウマ（プルジェワルスキーウマ）に、より近い関係にあった。現代の家畜馬は、約4,200年前にユーラシア全域へ急速に広がった、別の集団の子孫であるようだ。","この系統の広がりは、重大な結果をもたらした。馬のおかげで、人々ははるかに長い距離を移動し、物資を運び、広大な地域にわたって連絡を取り合えるようになった。馬はまた、戦争のあり方も一変させた。馬に乗った戦士や馬が引く戦車が、一部の社会に決定的な軍事的優位をもたらしたからである。一部の歴史家は、騎馬民族の移動が、ヨーロッパとアジアの全域に言語や技術を広める助けになったと主張している。","こうした進展にもかかわらず、多くの疑問が残っている。骨から馬が乗られていたかどうかがわかることはめったになく、また、初期の乗り手は、考古学的な記録に残るような道具を使っていなかったのかもしれない。そのため、人間が初めて馬の背に乗った正確な時期は、永遠にわからないかもしれない。"],"qs":[{"q":"第2段落の語「complicated」に最も意味が近いのはどれか。","opts":["確認した","単純でなくした","置き換えた","説明した"]},{"q":"第1段落によると、ボタイの人々が馬を狩るだけでなく飼っていたことを示す証拠は何か。","opts":["洞窟の壁に描かれた乗り手の絵","古代の土器に残った雌馬の乳の痕跡","遺跡の周りにある木の柵の跡","人間の道具と一緒に埋められた馬の骨"]},{"q":"第2段落によると、DNAの分析によって、ボタイの馬について何が明らかになったか。","opts":["現代のすべての馬の直接の祖先だった。","現代の家畜馬よりも、モウコノウマ（プルジェワルスキーウマ）に近い関係にあった。","モンゴルからボタイへ連れてこられていた。","約4,200年前にユーラシア全域へ急速に広がった。"]},{"q":"筆者が第3段落で「馬が引く戦車」に触れているのはなぜか。","opts":["馬が最初は農業に使われたことを示すため","馬が戦争をどう変えたかの例を挙げるため","馬がゆっくりとしか広まらなかった理由を説明するため","古代と現代の交通手段を対比するため"]},{"q":"第4段落から推測できることは何か。","opts":["初期の乗り手は常に金属の道具を使っていた。","科学者は現在、乗馬がいつ始まったかを正確に知っている。","最初期の乗馬の直接的な証拠は、見つけにくいかもしれない。","馬の骨は遺跡でめったに見つからない。"]}]},
+"a2":{"paragraphs":["都市は周囲の田園地帯よりも数度暖かいことが多く、これは都市ヒートアイランド現象として知られている。この差は、たいてい夜に最も目立つ。日中、アスファルトの道路や屋根のような暗い色の表面は、大量の太陽エネルギーを吸収する。日没後、これらの素材はためこんだ熱をゆっくりと放出し、農村部が冷えたずっと後まで、都市の空気を暖かく保つ。","この現象には、いくつかの要因が関わっている。建物や舗装が植生に取って代わるが、植生は通常、蒸発散によって空気を冷やしている。蒸発散とは、植物が水蒸気を放出する過程である。高い建物はまた、熱を閉じ込め、本来ならその熱を運び去るはずの風をさえぎることがある。さらに、車やエアコン、工場は排熱を生み出し、それが都市の気温を上げる。","都市の気温が高くなることは、深刻な結果をもたらす。暑い時期には住民が冷房にいっそう頼るので、エネルギーの需要が増える。また、熱は地表付近のオゾンを生み出す化学反応を速めるので、大気の質を悪化させることもある。最も重要なのは、極端な暑さが健康上の危険をもたらすことであり、とりわけ高齢者や、冷房を利用できない人々にとってそうである。","幸い、都市はこの現象を軽減するための手立てを講じることができる。木を植え、公園をつくることで、植生による冷却効果の一部を取り戻せる。また、クールルーフを導入した都市もある。クールルーフとは、日光をあまり吸収しない反射性の素材で覆われた屋根である。こうした対策でヒートアイランドを完全になくすことはできないが、意味のある違いを生むほどには気温を下げることができる。"],"qs":[{"q":"第3段落の語「poses」に最も意味が近いのはどれか。","opts":["もたらす、示す","まねる","減らす","描写する"]},{"q":"第1段落によると、ヒートアイランド現象が夜に最も強くなることが多いのはなぜか。","opts":["都市は夕方により多くの日光を受けるから。","都市の素材が、日中に吸収した熱を放出するから。","農村部が日没後に暖まるから。","夜は都市で風が強まるから。"]},{"q":"第2段落でこの現象の原因として挙げられていないものはどれか。","opts":["植生が舗装に置き換わること","風をさえぎる建物","車や機械からの排熱","都市部での降水量の増加"]},{"q":"第3段落によると、気温の上昇は大気の質にどう影響するか。","opts":["空気中に入るちりを増やす。","地表付近のオゾンを生み出す反応を速める。","空気中の酸素の量を減らす。","汚染物質が都市から出ていくのを妨げる。"]},{"q":"第4段落の主な目的は何か。","opts":["この現象は軽減できないと主張すること","都市の気温を下げられる対策を説明すること","屋根材の費用を比べること","公園が最初にどう設計されたかを説明すること"]}]},
+"ch1":{"say":"図書館が日曜日に開いているか知ってる？","opts":["日曜日は正午に開くと思うよ。","うん、その本はもう読んだよ。","2階にあるよ。","いや、先週の日曜日は行かなかったよ。"]},
+"ch2":{"say":"今朝の講義に出られなかったんだ。ノートを借りてもいいかな？","opts":["講義は9時に始まるよ。","いいよ、今夜コピーを送るね。","うん、教授はいたよ。","図書館で本を借りたよ。"]},
+"ch3":{"say":"勉強会の前に、カフェで会わない？","opts":["コーヒーが好きじゃないからだよ。","いいね。3時はどう？","去年そこで勉強したね。","朝はたいてい紅茶を飲むんだ。"]},
+"ch4":{"say":"研究レポートの締め切りって、変更になったの？","opts":["うん、今は次の金曜日が締め切りだよ。","新しいアパートに引っ越したんだ。","そのレポートは気候変動についてだよ。","明日、少し調べものをするよ。"]},
+"ch5":{"say":"どうも授業のウェブサイトにログインできないんだ。","opts":["その授業は今年すごく人気があるよ。","パスワードをリセットしてみた？","結果はノートに記録したよ。","そのウェブサイトには読む資料がたくさんあるよ。"]},
+"ch6":{"say":"窓を閉めてもらってもかまいませんか。少し寒いので。","opts":["全然かまいませんよ。今閉めますね。","はい、すてきな窓ですね。","その窓は中庭に面しています。","ノートパソコンはもう閉じました。"]},
+"ch7":{"say":"発表はどうだった？","opts":["バスで行ったよ。","木曜日の午後だよ。","実は、思ったよりうまくいったよ。","クラスで発表したよ。"]},
+"ch8":{"say":"今学期、リー先生の統計学の授業を取ってるんじゃなかった？","opts":["統計学は数学の一分野だよ。","取ってたんだけど、先週やめたんだ。","先生は理学棟で教えているよ。","いや、学期は5月に終わるよ。"]},
+"ch9":{"say":"コンピューター室のプリンター、また紙切れだよ。","opts":["コンピューター室のアシスタントに伝えておくね。","昨日、小論文を印刷したよ。","コンピューター室は今夜10時に閉まるよ。","紙は木から作られるんだよ。"]},
+"ch10":{"say":"学科のピクニックに、何か持っていったほうがいい？","opts":["キャンパスの近くの公園でやるよ。","できれば、飲み物を少しかな。","学科には教授が12人いるよ。","去年はカメラを持っていったよ。"]},
+"ch11":{"say":"専攻を生物学に変えようかと思ってるんだ。","opts":["生物学は3階で教えているよ。","本当？どうしてそう決めたの？","授業の前に着替えたよ。","私の専攻は読むものが多いんだ。"]},
+"ch12":{"say":"すみません、この席はどなたか座っていますか。","opts":["いいえ、どうぞ。","棚から取ったんです。","はい、その授業を取っています。","ここの席はとても座り心地がいいですよ。"]},
+"t1":{"lines":["こんにちは、ダニエル。今日はどんな用件かな？","こんにちは、キム先生。来学期の有機化学の履修登録をしようとしているんですが、システムに、前提科目が足りないと表示されるんです。","確認してみよう。ああ、一般化学IIの単位が、前の大学からまだ移されていないようだね。","ああ、そうなんですね。でも、成績証明書は6月に送ったんですけど。","時間がかかることもあるんだ。教務課にメールして、手続きを進めてもらうよう頼んでおくよ。その間に、授業が満員になる前に登録できるよう、一時的な特別許可を出してあげられるよ。","そうしていただけると助かります。本当にありがとうございます。"],"qs":[{"q":"学生がアドバイザーに会いに行くのはなぜか。","opts":["専攻の変更について尋ねるため","ある授業に登録できないから","推薦状をもらうため","授業の履修をやめたいから"]},{"q":"問題の原因は何か。","opts":["一般化学IIの単位を落とした。","前の大学の単位がまだ移されていない。","有機化学の授業がもう満員である。","成績証明書を間違った部署に送った。"]},{"q":"アドバイザーは何をするか。","opts":["来学期まで待つように言う","今すぐ登録させ、教務課に連絡する","成績証明書をもう一度送るよう頼む","別の化学の授業に登録させる"]}]},
+"t2":{"lines":["学生の皆さん、ご注目ください。毎年恒例のキャリアフェアが、今週の木曜日、午前10時から午後3時まで、メイン体育館で開かれることを、改めてお知らせします。60社を超える企業が参加し、その中には、夏のインターンシップの採用を行っている企業もいくつか含まれています。","今年は、名札を受け取るために、事前にオンラインで登録する必要がありますので、ご注意ください。登録の締め切りは水曜日の午後5時です。また、印刷した履歴書を何部か持ってくることをおすすめします。フェアの前に履歴書について助言を受けたい場合は、キャリアセンターが火曜日の午後に、予約不要の添削を行います。"],"qs":[{"q":"今年のキャリアフェアで新しくなった点は何か。","opts":["図書館で開かれる。","学生は事前にオンラインで登録しなければならない。","4年生しか参加できない。","2日間にわたって行われる。"]},{"q":"話し手は何をすすめているか。","opts":["午前10時より前に着くこと","印刷した履歴書を何部か持ってくること","フェアの前に企業に連絡すること","去年の名札をつけること"]},{"q":"学生が履歴書について助言を受けられるのはいつか。","opts":["火曜日の午後","水曜日の午後5時","木曜日の午前","金曜日の午後"]}]},
+"t3":{"lines":["今日は、生物発光、つまり生物が光を生み出すことについて話したい。夏の夕方にホタルを見たことがあるだろうが、生物発光をする種のほとんどは、実は海に住んでいる。実際、深海の動物のおよそ4分の3は光を出すことができると、研究者たちは推定している。","では、光がほとんどまったくない場所で、なぜ動物は光を作るのだろうか。主な理由がいくつかある。1つは、獲物をおびき寄せるためだ。たとえばアンコウには、口の前に垂れ下がる光るルアーがある。小魚がその光に向かって泳いでいき、そして、まあ、次に何が起こるかは想像がつくだろう。","もう1つの用途は防御だ。イカの中には、光る液体を雲のように放出するものがいて、それが捕食者を混乱させ、イカが逃げられるようにする。3つ目の理由はコミュニケーションで、たとえば交尾の相手を見つけることだ。興味深いのは、生物発光が何十回も独立に進化してきたということで、このことから、それは非常に役に立つ適応に違いないとわかる。"],"qs":[{"q":"この講義は主に何についてのものか。","opts":["ホタルが夏の夕方にどのようにコミュニケーションをとるか","一部の生物が光を出す理由","深海の構造","イカが捕食者からどのように逃げるか"]},{"q":"教授がアンコウに触れているのはなぜか。","opts":["目の見えない魚がいることを示すため","光が、動物が獲物を捕らえるのにどう役立つかを例で示すため","深海魚とホタルを比べるため","生物発光がまれである理由を説明するため"]},{"q":"生物発光が何度も独立に進化してきたという事実から、教授は何を結論づけているか。","opts":["非常に役に立つ適応に違いない。","最初にホタルで現れた。","その起源について、科学者の意見は分かれている。","海にしか見られない。"]}]},
+"t4":{"lines":["では、学生である皆さん全員に直接関係のあることに話を移そう。分散効果だ。これは、学習の時間を1回にまとめて詰め込むよりも、時間をかけて分散させたほうが、情報がよく記憶されるという知見である。","この効果は、1880年代に、ドイツの心理学者ヘルマン・エビングハウスによって初めて記述された。彼は、無意味つづりのリストを使って、自分自身の記憶を調べた。そして、練習を数日に分散させると、リストを覚えるのに必要な反復の総数が少なくて済むことを発見した。それ以来、分散効果は、語彙、数学、さらには運動技能まで、あらゆる種類の素材について、何百もの研究で確かめられてきた。","では、なぜこれが効くのだろうか。1つの説明は、時間をおいてから学習内容に戻ると、それを思い出すのに少し余計に努力しなければならず、その努力が記憶を強めるというものだ。だから、試験の前の晩の詰め込みがはかどっているように感じられるとしても、まあ、翌朝には役に立つかもしれないが、1週間もすれば、おそらくそのほとんどを忘れてしまうだろう。"],"qs":[{"q":"この話の主なテーマは何か。","opts":["ドイツの心理学の歴史","長期的な記憶を高める学習の仕方","無意味つづりが覚えにくい理由","運動技能が語彙とどう違うか"]},{"q":"教授によると、エビングハウスは何を発見したか。","opts":["毎日学習すると、リストを早く忘れた。","練習を数日に分散させると、必要な反復の回数が少なくて済んだ。","詰め込みが最も効率的な方法だった。","無意味つづりは、実在の語より覚えやすかった。"]},{"q":"詰め込み学習について、教授はどう考えているか。","opts":["試験に備える最善の方法である。","短期的には役立つかもしれないが、長期的に記憶を保つにはよくない。","運動技能にはよく効く。","一度も研究されたことがない。"]}]},
+"b1":{"ctx":"明日のゼミの課題文献、読み終わった？","ans":"ううん、まだ読み始める機会がなくて。","exp":"現在完了の否定 haven't had ＋ a chance to do で「〜する機会がまだない」。to start の目的語 it は the reading を指し、yet は否定文で、ふつう文末に置いて「まだ」を表す。since は「〜以来」の意味で、いつからかを示す起点（since Monday など）が文か文脈に必要だが、ここには起点が無いので使えない。"},
+"b2":{"ctx":"文学のレポートに使う本は見つかった？","ans":"まだなんだ。教授が勧めた本は、もう貸し出し中なんだ。","exp":"The book を関係代名詞 that の節（that the professor recommended「教授が勧めた」）が後ろから説明し、そのあとに文全体の動詞 is が来る。be checked out は図書館の本が「貸し出し中である」という意味。who は先行詞が人のときの関係代名詞なので、物である book には使えない。"},
+"b3":{"ctx":"どうして校外見学は中止になったの？","ans":"どうやら、そんなに急な話では、バス会社が十分な数の運転手を用意できなかったらしいよ。","exp":"主語 the bus company、助動詞 could not ＋動詞の原形 provide、目的語 enough drivers の順に並べる。on short notice は「急な知らせで、直前になって」という決まった言い方で、such が入って「そんなに急では」と強めている。この言い方の notice は数えない名詞なので、such のあとに a は付かない。"},
+"b4":{"ctx":"教務課がどこにあるか教えてもらえますか？","ans":"ごめんなさい、私もそれがどこにあるのか知らないんです。","exp":"know の目的語に疑問文を入れるときは間接疑問になり、where it is（疑問詞＋主語＋動詞）の語順にする。either は否定文の文末で「〜も（…ない）」を表す（肯定文なら too）。間接疑問では疑問文を作るための do や does を使わず、そもそも be 動詞（is）の文なので、does は入らない。"},
+"b5":{"ctx":"昨日のゲスト講演はどうだった？","ans":"今までに聞いた中で、いちばんおもしろい講演の一つだったよ。","exp":"one of the ＋最上級＋複数名詞で「最も〜なものの一つ」。I have ever attended は talks を後ろから説明する節で（関係代名詞が省略されている）、ever は最上級と組んで「今までに」を表す。most interesting がすでに最上級なので、比較級の more は入らない。"},
+"b6":{"ctx":"4月の学会には行くの？","ans":"旅費を払えるだけのお金があれば、行くんだけどね。","exp":"I would のあとに go が省略された仮定法過去で、if I had（過去形）と組んで「お金があれば行くのだが（実際には無い）」を表す。enough money to pay for the trip は「旅費を払うのに足りるお金」。現実と違う仮定の話なので、will は使えない。"},
+"b7":{"ctx":"指導教員には何て言われたの？","ans":"先生は、来学期に統計学の授業を取るよう勧めてくれたよ。","exp":"suggest that ＋主語＋動詞の原形で「〜するよう勧める」（should が省略された形で、主語が三人称でも動詞は原形のまま）。suggest は to 不定詞を取らない動詞なので（× suggested to take、× suggested me to take）、to は入らない。"},
+"b8":{"ctx":"研究論文はもう始めた？","ans":"うん、先週の月曜日からずっと取り組んでいるよ。","exp":"I've been working は現在完了進行形で「（過去のある時点から今まで）ずっと取り組んでいる」。work on は「〜に取り組む」。since は起点（last Monday）、for は期間（for a week など）に使うので、ここは since で、for は余る。"},
+"b9":{"ctx":"新しい寮はもう完成した？","ans":"まだだよ。来年の春までに完成する予定なんだ。","exp":"be expected to do で「〜する予定だ、〜する見込みだ」。寮は「完成させられる」側なので不定詞も受け身の to be completed にし、by next spring（来春までに）で期限を示す。expect は to 不定詞を取る動詞なので、completing は入らない。"},
+"b10":{"ctx":"今日はどうしてそんなに疲れてるの？","ans":"今朝が締め切りだった実験レポートを仕上げていて、夜遅くまで起きていたんだ。","exp":"stay up late ＋ -ing 形で「〜して夜遅くまで起きている」（finishing＝仕上げながら）。that was due this morning は the lab report を後ろから説明する関係代名詞の節で、be due は「締め切りである」。動詞の原形 finish はこの位置に置けないので余る。"},
+"b11":{"ctx":"図書館は混んでると思う？","ans":"たぶんね。期末試験の直前は混みやすいから。","exp":"tend to ＋動詞の原形で「〜しがちだ、〜する傾向がある」。get busy は「混む」、right before は「〜の直前に」（right は before を強める）。主語 It（図書館）のあとには述語の動詞が要るので、-ing 形の tending は入らない。"},
+"b12":{"ctx":"期限を過ぎた課題、教授は受け取ってくれた？","ans":"うん、金曜日までに出しさえすれば受け取るって言ってくれた。","exp":"as long as は「〜しさえすれば、〜する限り」という条件。she would は時制の一致で will が過去形になったもので、条件の節は金曜日がまだ先のことなので現在形の submit のままでよい。unless（〜しない限り）を使うと意味が逆になる。"},
+"b13":{"ctx":"スタジアムへ行くには、どうするのがいちばんいい？","ans":"いちばん簡単なのは、正門から出ているシャトルバスに乗ることだよ。","exp":"The easiest way is to take … で「いちばん簡単な方法は〜することだ」（to 不定詞が補語）。the shuttle を関係代名詞の節 that leaves from the main gate（正門から出発する）が後ろから説明する。節の動詞は、説明される the shuttle（単数）に合わせて三単現の leaves にするので、s の無い leave は入らない。"},
+"b14":{"ctx":"試験の日程が変わったかどうか、何か聞いてる？","ans":"試験の日が変わったのかどうか、よくわからないんだ。","exp":"whether … or not で「〜かどうか」（or not は whether の直後に置いて whether or not … としてもよい）。間接疑問なので the exam has been moved（主語＋動詞。現在完了の受け身）と平叙文の語順になる。does は一般動詞の現在形の疑問文や否定文を作る語で、has been moved のような完了形とは一緒に使えないので入らない。"},
+"b15":{"ctx":"どうしてこの大学を選んだの？","ans":"いちばん惹かれたのは、この大学の充実した工学のプログラムだった。","exp":"関係代名詞 what は「〜するもの」の意味で、What attracted me most（私をいちばん引きつけたもの）が文の主語、was が動詞になる。most は「いちばん」と動詞を修飾する副詞（What most attracted me の語順でもよい）。what は先行詞を含む関係代名詞だが which にはその使い方が無いので、Which は入らない。"},
+"e1":{"scenario":"あなたは最近、大学の機材センターからノートパソコンを借りたが、2日後に正常に動かなくなった。","bullets":["ノートパソコンの不具合を説明する","それが授業の課題にどう影響したかを説明する","次にどうすればよいかを尋ねる"],"tips":"大学の機材センターの責任者に宛てた、学生から職員へのメールなので、丁寧な書き方にする（Dear Ms. Grant,）。苦情として責めるのではなく、状況を伝えて対応をお願いするトーンがよい。1つ目は症状を具体的に（いつから・何が起きるか）、2つ目は課題や授業への影響を具体例で、3つ目は修理や交換などの手順を質問の形で書く。使える表現：I am writing to report a problem with…、This has made it difficult to…、Could you please let me know…?","model":"Dear Ms. Grant,\n\nI borrowed a laptop from the equipment center last Monday, and I am writing to report a problem with it. Two days later, it started shutting down by itself every few minutes, even when the battery was fully charged.\n\nThis has made it difficult to keep up with my coursework. When the laptop turned off, I lost part of a history essay, and yesterday I could not join an online group meeting for my statistics class.\n\nCould you please let me know what I should do next? I can bring the laptop back to the center this week if it needs to be repaired or replaced.\n\nThank you for your help.\n\nSincerely,\nDaniel Brooks","modelJa":"グラント様\n\n先週の月曜日に機材センターからノートパソコンを借りましたが、その不具合についてご報告したく、ご連絡いたしました。2日後から、バッテリーがフル充電のときでも、数分おきに勝手に電源が切れるようになりました。\n\nこのため、授業の課題についていくのが難しくなっています。パソコンの電源が切れたときに歴史のレポートの一部が消えてしまい、昨日は統計学の授業のオンラインのグループ会議にも参加できませんでした。\n\n次にどうすればよいか、教えていただけますでしょうか。修理や交換が必要であれば、今週中にパソコンをセンターにお持ちできます。\n\nご対応に感謝いたします。\n\n敬具\nダニエル・ブルックス"},
+"e2":{"scenario":"あなたは学生サークルのメンバーで、そのサークルは地元の作家を招いて、キャンパスで講演をしてもらいたいと考えている。","bullets":["自分とサークルについて紹介する","なぜサークルが彼に講演してほしいのかを説明する","イベントの候補日と詳細を提案する"],"tips":"面識のない地元の作家への依頼なので、いちばん丁寧な書き方にし、敬称を付けて Dear Mr. Okafor, で始める。1つ目は名前・学年・サークルの活動内容を短く、2つ目は作品のどこに惹かれたか、講演を聞いて何を知りたいかを具体的に、3つ目は候補日を2つほど挙げ、時間・場所・参加人数なども添える。決めるのは相手なので、押しつけず控えめにお願いする言い方がよい。使える表現：I am writing on behalf of…、We would be honored if you could…、I look forward to hearing from you.","model":"Dear Mr. Okafor,\n\nMy name is Emily Carter, and I am a second-year literature student. I am writing on behalf of our campus book club, a group of about thirty students who meet weekly to discuss novels.\n\nOur members have enjoyed your stories about life in our city, and we would love to hear how you turn familiar places into fiction. We would be honored if you could give a talk on campus.\n\nWe were thinking of a Tuesday or Thursday evening in early March, from 6 to 7 p.m., in the student center. About forty students would attend, and there would be time for questions.\n\nI look forward to hearing from you.\n\nSincerely,\nEmily Carter","modelJa":"オカフォー様\n\n私はエミリー・カーターと申します。文学を専攻する2年生です。約30人の学生が毎週集まって小説について話し合っている、キャンパスの読書サークルを代表してご連絡いたしました。\n\nメンバーは、この街の暮らしを描いたオカフォー様の作品を楽しく読んできました。身近な場所をどのように物語にしているのか、ぜひお話をうかがいたいと思っています。キャンパスでご講演いただけましたら、大変光栄です。\n\n日時は、3月初めの火曜日か木曜日の夕方、午後6時から7時までを考えており、場所は学生センターです。学生が40人ほど参加する予定で、質疑応答の時間も設けます。\n\nお返事を楽しみにお待ちしております。\n\n敬具\nエミリー・カーター"},
+"e3":{"scenario":"教授は、あなたのグループの発表を来週の月曜日に行うと告げた。しかし、グループのメンバーの1人が病気で、出席できない。","bullets":["状況を説明する","解決策を提案する","提案に関わる要件について尋ねる"],"tips":"担当教授に宛てた相談のメールなので、丁寧に、ただし要点は短く書く（Dear Dr. Hughes,）。1つ目は誰が・なぜ出られないかを簡潔に、2つ目は「発表を延期する」「欠席者の担当部分を録画で流す」など具体的な案を1つ出し、3つ目はその案に必要な条件（録画の長さ・提出の期限・形式など）を質問する。決めるのは教授なので、案は Would it be possible…? のようなお願いの形にする。使える表現：Unfortunately,…、Would it be possible for … to…?、Could you let us know if there are any requirements for…?","model":"Dear Dr. Hughes,\n\nI am writing about our group presentation, which is scheduled for next Monday. Unfortunately, one of our members, Maria, is ill and has been told by her doctor to rest for at least a week, so she will not be able to attend.\n\nWould it be possible for Maria to record her part of the presentation at home? We could play the video during our session, and the rest of us would present our sections as planned.\n\nIf this is acceptable, could you let us know if there are any requirements for the recording, such as a time limit or a deadline for sending it to you?\n\nThank you for your understanding.\n\nSincerely,\nKevin Lee","modelJa":"ヒューズ先生\n\n来週の月曜日に予定されている、私たちのグループ発表についてご連絡いたしました。あいにく、メンバーの1人のマリアが病気で、医師から少なくとも1週間は休むように言われているため、出席することができません。\n\nマリアが自宅で自分の担当部分を録画することは可能でしょうか。そうすれば、発表の時間にその動画を流し、残りのメンバーは予定どおりそれぞれの担当部分を発表します。\n\nもしこの方法でよろしければ、録画について、時間の制限や先生にお送りする期限など、何か条件があれば教えていただけますか。\n\nご理解いただき、ありがとうございます。\n\n敬具\nケビン・リー"},
+"e4":{"scenario":"あなたは最近、キャンパスのキャリアセンターが開いた、就職面接のスキルについてのワークショップに参加した。","bullets":["ワークショップのお礼を言う","ワークショップの中で特に役に立ったことを挙げる","今後のワークショップのテーマを提案する"],"tips":"キャリアセンターの職員へのお礼のメールなので、丁寧で温かいトーンにする（Dear Ms. Patel,）。お礼は最初の段落で、何のワークショップかを添えて伝える。役に立った点は1つに絞り、それで自分がどう変わったか（気づいたこと・始めたこと）まで書くと具体的になり、提案には、なぜそのテーマが学生に必要かを一言添える。使える表現：Thank you very much for…、I found … especially useful、I would like to suggest…","model":"Dear Ms. Patel,\n\nThank you very much for organizing last week's workshop on job interview skills. It was well planned, and I learned a lot from it.\n\nI found the mock interviews especially useful. Practicing with a partner and getting feedback showed me that my answers tend to be too long. Since then, I have been practicing shorter answers that focus on one clear example.\n\nFor a future workshop, I would like to suggest a session on writing cover letters. Many of my friends are applying for internships, and they are not sure how to make their letters stand out.\n\nThank you again for your support.\n\nSincerely,\nSarah Kim","modelJa":"パテル様\n\n先週の就職面接のスキルについてのワークショップを企画していただき、本当にありがとうございました。よく練られた内容で、多くのことを学びました。\n\n特に役に立ったのは模擬面接です。パートナーと練習してフィードバックをもらったことで、自分の答えが長くなりがちだと気づきました。それ以来、わかりやすい例を1つに絞った、短い答えを練習しています。\n\n今後のワークショップとして、カバーレターの書き方の講座を提案したいと思います。友人の多くがインターンシップに応募していますが、どうすれば自分の手紙を目立たせられるのか、わからずにいます。\n\nご支援に改めて感謝いたします。\n\n敬具\nサラ・キム"},
+"g1":{"prof":"これから数週間、高等教育におけるテクノロジーの役割について議論していきます。現在、すべての講義を録画してオンラインで公開し、学生がいつでも見られるようにしている大学もあります。支持する人は、これによって学び方がより柔軟になると言い、批判する人は、学生が授業に来なくなるのではないかと心配しています。皆さんはどう考えますか。大学はすべての講義を録画し、オンラインで公開すべきでしょうか。そう考える理由、またはそう考えない理由は何ですか。","students":["講義を録画するのはとてもいい考えだと思います。アルバイトをしていたり、家庭での責任を負っていたりする学生は多く、ときにはどうしても授業に出られないことがあります。また、録画があれば、試験の前に講義の難しい部分を見直すこともできます。","私は反対です。講義がいつでもオンラインで見られるとなると、多くの学生は見るのを後回しにして、遅れを取ってしまうでしょう。それに、教室にいれば質問をしたり、クラスメートと考えを話し合ったりできますが、動画ではそれができません。"],"tips":"問いは「大学はすべての講義を録画してオンラインで公開すべきか」。最初の1文で賛成か反対かをはっきり書く（「一部の講義だけ」のような条件付きの立場でもよいが、その場合も条件を明確にする）。ケンジ（柔軟さ・試験前の復習）かソフィア（先延ばし・質問や議論の機会）のどちらかに名前を挙げて触れ、同意するのか反論するのかを示す。そのうえで2人が挙げていない理由を1つ選び、自分の経験などの具体例で支える（例：第二言語で学ぶ学生が、聞き取れなかった部分を聞き直せる）。","model":"I believe universities should record and post all lectures online. Sofia is right that some students might put off watching the videos, but that is not a good reason to take recordings away from everyone. In addition to the benefits Kenji mentioned, recordings are especially helpful for students who are studying in a second language. For example, when I took an economics class, the professor spoke very quickly, and I often missed key terms. Being able to replay those parts later helped me understand the material and take better notes. Universities could still encourage students to come to class by giving points for participation in discussions.","modelJa":"私は、大学はすべての講義を録画してオンラインで公開すべきだと考えます。一部の学生が動画を見るのを後回しにするかもしれないというソフィアの指摘はもっともですが、それは全員から録画を取り上げる理由にはなりません。ケンジが挙げた利点に加えて、録画は第二言語で学んでいる学生にとって特に役に立ちます。たとえば、私が経済学の授業を取ったとき、教授の話し方がとても速く、重要な用語をよく聞き逃しました。あとでその部分を再生し直せたおかげで、内容を理解し、よりよいノートを取ることができました。それでも大学は、議論への参加に点数を与えることで、学生が授業に来るよう促すことができます。"},
+"g2":{"prof":"多くの都市が、交通量と大気汚染を減らす方法を探しています。一つの案は、公共交通機関を完全に無料にすることです。もう一つは、同じ額のお金を使って、自転車レーンや車の入れない通りを増やすことです。都市の交通量を減らすには、どちらの方法がより効果的だと思いますか。また、それはなぜですか。","students":["公共交通機関を無料にするほうが効果的でしょう。運賃の負担は、人が公共交通機関ではなく車を選ぶ主な理由の一つで、収入の低い家庭では特にそうです。バスや電車が無料になれば、多くの人が車を家に置いて出かけるでしょう。","私なら自転車レーンを選びます。私の住む街では、バスはすでに混んでいて遅いので、無料にしても魅力が増すことはないでしょう。安全な自転車レーンがあれば、少なくとも短い距離の移動では、速くて健康的な別の手段が手に入るでしょう。"],"tips":"問いは「都市の交通量を減らすには、公共交通の無料化と自転車レーンの整備のどちらが効果的か」という二択なので、最初にどちらかを選ぶ（両方とすると答えがぼやける）。アナ（費用の負担）かマーカス（バスの混雑・短い距離の移動）の論点に名前を挙げて触れ、賛成ならそれを深め、反対なら弱い点を指摘する。2人が触れていない観点（天候、通勤の距離、高齢者や子ども連れの使いやすさ など）を1つ選び、具体例で説明する。","model":"I think making public transportation free would be more effective. I understand Marcus's point that crowded buses are not attractive, but bike lanes mainly help people who are able and willing to ride a bike. Many people commute long distances, and few of them would cycle that far, especially in rain or snow. Bikes are also not practical for many older people or for parents with small children. Free buses and trains, on the other hand, can serve almost everyone in every season. Moreover, if more people ride buses, the city will have a stronger reason to add buses and routes, which would ease the crowding that Marcus describes.","modelJa":"私は、公共交通機関を無料にするほうが効果的だと思います。混雑したバスには魅力がないというマーカスの指摘はわかりますが、自転車レーンが役に立つのは、主に自転車に乗ることができて、乗る気もある人です。長い距離を通勤する人は多く、そこまで自転車で通う人はほとんどいないでしょう。雨や雪の日ならなおさらです。また、多くの高齢者や、小さな子どもを連れた親にとって、自転車は現実的ではありません。一方、無料のバスや電車なら、どの季節でも、ほとんどすべての人が使えます。さらに、バスに乗る人が増えれば、市がバスの本数や路線を増やす理由もいっそう強くなり、マーカスの言う混雑も和らぐでしょう。"},
+"g3":{"prof":"現在、多くの企業が、従業員に週に数日の在宅勤務を認めています。これによって生産性や仕事への満足度が上がると考える管理職もいれば、同じオフィスで働くことがチームワークと創造性には欠かせないと主張する管理職もいます。あなたの意見では、リモートワークは長期的に見て企業のためになるでしょうか。理由を説明してください。","students":["リモートワークは企業のためになると思います。従業員は通勤の時間が省けるので、疲れが少なくなり、仕事に集中しやすくなります。また、企業は遠くに住んでいる優秀な人を雇うこともできます。","私は納得していません。最高のアイデアのいくつかは、オフィスでの何気ない会話から生まれます。全員が在宅で働いていると、特に新入社員は、経験豊富な同僚から学ぶ機会を逃してしまいます。"],"tips":"問いは「リモートワークは長期的に企業のためになるか」。in the long run（長い目で見て）が要なので、目先の効果だけでなく、数年単位で企業にどう影響するかに触れると問いに沿った答えになる。最初に立場を示し、レナ（通勤の負担・遠くに住む人の採用）かラヴィ（何気ない会話・新人の学び）に名前を挙げて触れる。2人が言っていない理由（例：経験のある社員が辞めずに済む、オフィスにかかる費用、チームの一体感）を1つ選び、具体例で説明する。","model":"In my opinion, remote work is good for companies in the long run, as long as teams still meet in person regularly. Ravi makes a fair point that new employees may miss chances to learn from experienced colleagues, but this problem can be solved by asking teams to come to the office once or twice a week. A long-term benefit that neither Lena nor Ravi mentioned is that flexible work helps companies keep skilled workers. For instance, an employee who has to care for a young child or a sick parent does not need to quit if she can work from home on the other days. Since replacing an experienced worker takes a lot of time and money, keeping such people is a real advantage over many years.","modelJa":"私の意見では、チームが定期的に顔を合わせることを続けるのであれば、リモートワークは長期的に見て企業のためになります。新入社員が経験豊富な同僚から学ぶ機会を逃しかねないというラヴィの指摘はもっともですが、この問題は、チームに週に1、2回オフィスへ来てもらうことで解決できます。レナもラヴィも触れていない長期的な利点は、柔軟な働き方によって、企業が技能のある人材を引き留められることです。たとえば、幼い子どもや病気の親の世話をしなければならない社員も、それ以外の日に在宅で働けるなら、仕事を辞めずに済みます。経験のある社員の代わりを見つけるには多くの時間とお金がかかるので、そうした人を引き留められることは、長い年月で見れば大きな利点です。"},
+"r1":{"sentences":["図書館へようこそ。","受付カウンターは左手にあります。","本は一度に10冊まで借りられます。","学習室は、最大1週間前からオンラインで予約できます。","資料を探すのに手助けが必要なときは、司書のだれかに声をかけてください。","返却期限を過ぎて返された本には、1日ごとに少額の料金がかかります。","2階のプリンターを使いたい学生は、学生証を持ってきてください。"]},
+"r2":{"sentences":["皆さん、おはようございます。","どこでもお好きな席にお座りください。","今日の見学ツアーは1時間ほどかかります。","学生センターから出発して、そのあと食堂を回ります。","今日のうちに、必ず自分の予定表を受け取ってください。","スポーツセンターは全学生が利用できますが、先に登録をする必要があります。","ツアーのあとで質問があれば、気軽に案内所に立ち寄ってください。"]},
+"r3":{"sentences":["ゴーグルを着けてください。","実験室では、食べたり飲んだりしないでください。","通路はいつも空けておいてください。","実験室を出る前に手を洗ってください。","実験を始める前に、必ず手順書を注意深く読んでください。","薬品が皮膚に付いたら、すぐに水で洗い流してください。","実験レポートには、結果に加えて、考えられる誤差についての短い考察も入れてください。"]},
+"i1":{"questions":["調査にご協力いただきありがとうございます。まず、ふだんどこで勉強しているか、またその理由を教えていただけますか。","一人で勉強するのと、ほかの人と一緒に勉強するのとでは、どちらが好きですか。説明してください。","大事な試験の準備をしなければならなかったときのことを話してください。何をしましたか。","今の学生は勉強するときにテクノロジーに頼りすぎている、と言う人がいます。あなたは賛成ですか、反対ですか。それはなぜですか。"],"tips":["場所とその理由を聞く質問。最初の文で「ふだんは〇〇で勉強する」と言い切り、理由を1〜2つと、そこでの具体的な場面を1つ添える。","二択の好みを聞く質問。どちらか一方を最初に選び、理由と、実際にそうしてよかった場面を1つ話す（場合によって変わるなら、そのあとで一言補う）。","過去の経験を聞く質問。いつ・何の試験かを最初の1文で示し、したことを First、Second のように順番に2〜3つ過去形で話し、最後に結果を一言で締める。","意見を聞く質問。賛成か反対かを最初に言い、理由を1つと、自分の勉強のしかたからの具体例を1つ。部分的に賛成する場合も、どちらに近いかを先に言う。"],"model":["I usually study at the university library, mainly because it's quiet and I can concentrate there. At home, it's easy to get distracted by my phone or the TV, but in the library everyone around me is working, so I feel motivated to keep going. I also like that I can find books and articles right away when I need them. For example, last week I was writing a history paper, and I found two useful sources on the shelves just a few minutes after I started looking.","I prefer studying alone, especially when I need to memorize things or read difficult material. When I'm by myself, I can work at my own pace and take breaks whenever I need them. With other people, we often end up chatting instead of studying. That said, group study can be useful right before a test. For example, before my last biology exam, I studied alone for most of the week, and then two classmates and I quizzed each other. That helped me find gaps in my knowledge.","When I was preparing for my university entrance exams, I had to study several subjects at the same time. First, I made a weekly schedule so that I could study each subject a little every day instead of cramming. Second, I did timed practice with past exam questions, which helped me get used to the pressure. I also checked my mistakes carefully and kept a notebook of them. In the end, I felt much calmer on the day of the test, and I did better than I'd expected.","I mostly disagree. Technology itself isn't the problem. What matters is how students use it. For example, I use a flashcard app to review vocabulary on the train, and it's helped me study a little every day. Of course, it's a problem when students just copy answers from the internet without thinking. But that's a problem with study habits, not with technology. So instead of telling students to use less technology, schools should teach them to use it in ways that make them think more."],"modelJa":["ふだんは大学の図書館で勉強しています。主な理由は、静かで集中できるからです。家だとスマホやテレビに気を取られやすいのですが、図書館では周りのみんなが勉強しているので、続けようという気持ちになります。必要なときに本や論文をすぐに探せるところも気に入っています。たとえば先週、歴史のレポートを書いていたときは、探し始めてほんの数分で、役に立つ資料を棚から2つ見つけました。","一人で勉強するほうが好きです。特に、何かを暗記したり、難しい資料を読んだりしなければならないときはそうです。一人なら自分のペースで進められて、必要なときにいつでも休憩できます。ほかの人と一緒だと、勉強せずにおしゃべりになってしまうことがよくあります。とはいえ、試験の直前にはグループでの勉強も役に立つことがあります。たとえば、この前の生物学の試験の前は、1週間のほとんどを一人で勉強し、そのあとクラスメート2人と問題を出し合いました。それで、自分の知識の抜けている部分がわかりました。","大学の入学試験の準備をしていたとき、いくつもの科目を同時に勉強しなければなりませんでした。まず、直前に詰め込むのではなく、毎日どの科目も少しずつ勉強できるように、1週間の予定表を作りました。次に、時間を区切って過去問を解きました。これで、プレッシャーに慣れることができました。また、間違えたところを丁寧に確認して、ノートに書きためておきました。最終的に、試験の当日はずっと落ち着いていられて、思っていたよりもよい結果が出ました。","私はおおむね反対です。テクノロジーそのものが問題なのではありません。大事なのは、学生がそれをどう使うかです。たとえば、私は電車の中で単語カードのアプリを使って語彙を復習していて、そのおかげで毎日少しずつ勉強できています。もちろん、学生がよく考えずにインターネット上の答えをそのまま写すのは問題です。でも、それは勉強の習慣の問題で、テクノロジーの問題ではありません。ですから、学校は学生にテクノロジーを使う量を減らすように言うのではなく、もっと頭を使うような使い方を教えるべきです。"]},
+"i2":{"questions":["私たちは、人々がスマートフォンをどのように使っているかを調べています。ふだんの1日の中で、あなたはスマートフォンをどのように使っていますか。","特に便利だと思うアプリはありますか。それについて教えてください。","スマートフォンを使う時間を減らそうとしたことはありますか。どうなりましたか。","学校は、教室でのスマートフォンを禁止すべきでしょうか。そう考える理由、またはそう考えない理由を教えてください。"],"tips":["ふだんの習慣を聞く質問。「主に〇〇に使う」と最初にまとめ、朝・移動中・夜のように時間の流れに沿って、使い方を2〜3つ現在形で話す。","具体的な物について説明させる質問。どんな種類のアプリかを最初に言い（商品名は無くてもよい）、何ができるか、なぜ自分にとって便利かを、使った場面を1つ挙げて話す。","経験とその結果を聞く質問。やったことがあるかを最初に答え、何をしたか・どうなったかを過去形で順に話す。うまくいかなかった話でもよく、最後に学んだことを一言添える。","賛否を聞く質問。禁止に賛成か反対かを最初に言い、理由を1つと具体例を1つ。「全面禁止ではなく授業中だけ」のように条件を付けるなら、それを最初の文に入れる。"],"model":["I mostly use my phone for staying in touch with people and getting information. In the morning, I check the weather and the news while I eat breakfast. On the train, I usually listen to podcasts or study English vocabulary with an app. During the day, I send messages to my friends and classmates, and I use the map when I go somewhere new. At night, I try not to use it too much, but I often end up watching short videos before bed.","Yes, I find a language-learning app especially useful. It gives me short lessons that take only about five minutes, so I can do one while I'm waiting for the bus or standing in line. What I like most is that it reminds me to review words I've gotten wrong before. For example, I kept mixing up two similar English words, and the app showed them to me again and again until I finally got them right. Because of that, I study a little every day, even when I'm busy.","Yes, I tried that last year because I realized I was spending more than three hours a day on social media. First, I turned off most of my notifications, and then I set a daily time limit on my phone. The first week was hard, and I kept picking it up out of habit. But after a while, I got used to it, and I had more time for reading and sleep. I didn't stick to it perfectly, but I learned that small changes can make a big difference.","I don't think schools should ban smartphones completely, but they should limit their use during lessons. Phones can be useful for learning. For example, students can look up words or check facts quickly during a group activity. On the other hand, if students can use their phones freely, many of them will check social media instead of listening to the teacher. So I think the best rule is that phones stay in students' bags unless the teacher asks students to use them for a specific task."],"modelJa":["スマホは主に、人と連絡を取ることと情報を得ることに使っています。朝は、朝食を食べながら天気とニュースを確認します。電車の中では、たいていポッドキャストを聞くか、アプリで英単語を勉強します。日中は友人やクラスメートにメッセージを送り、初めての場所へ行くときは地図を使います。夜はあまり使いすぎないようにしているのですが、寝る前につい短い動画を見てしまうことがよくあります。","はい、語学学習のアプリが特に便利だと思います。5分ほどで終わる短いレッスンがあるので、バスを待っている間や列に並んでいる間にも1回できます。いちばん気に入っているのは、前に間違えた単語を復習するように知らせてくれるところです。たとえば、似ている2つの英単語をずっと取り違えていたのですが、アプリがそれを何度も出してくれて、ついに正しく覚えられました。そのおかげで、忙しいときでも毎日少しずつ勉強しています。","はい、去年やってみました。SNSに1日3時間以上使っていることに気づいたからです。まず、ほとんどの通知を切って、それからスマホに1日の利用時間の上限を設定しました。最初の1週間はつらくて、癖でつい手に取ってしまいました。でもしばらくすると慣れてきて、読書や睡眠の時間が増えました。完璧に続けられたわけではありませんが、小さな変化が大きな違いを生むことを学びました。","学校がスマホを完全に禁止すべきだとは思いませんが、授業中は使用を制限すべきです。スマホは学習にも役に立ちます。たとえば、グループ活動の最中に、単語を調べたり事実をすばやく確かめたりできます。一方で、学生が自由にスマホを使えるとなると、多くの学生が先生の話を聞かずにSNSを見てしまうでしょう。ですから、先生が特定の作業のために使うよう指示したとき以外は、スマホはかばんの中にしまっておく、というのがいちばんよいルールだと思います。"]},
+"i3":{"questions":["私たちは、人々が住む場所をどのように選ぶのかを研究しています。今住んでいる町や市について説明してもらえますか。","住んでいる地域でいちばん気に入っているのはどんなところですか。","訪れたことのある場所で、いつか住んでみたいところについて話してください。","若い人にとっては、大都市に住むのと小さめの町に住むのとでは、どちらがよいと思いますか。あなたの意見を説明してください。"],"tips":["今住んでいる場所の描写を求める質問。規模と位置（大都市からの距離など）を最初の1文で示し、特徴を2〜3つ、自分の生活とのつながりとともに話す。地名は出さなくてよい。","いちばん（most）好きな点を聞く質問なので、1つに絞って最初に言い切り、なぜそれが自分にとって大事かと、実際の過ごし方を1つ話す。","経験と希望を組み合わせた質問。どこを訪れたかを最初に言い、そこで見たこと・感じたことを過去形で話してから、住んでみたい理由を話す（I'd love to live there someday などが使える）。","比較して意見を言う質問。大都市か小さな町かを最初に選び、理由を1つと具体例を1つ。反対側の利点に It's true that … but … のように一言触れてから自分の立場に戻ると、説得力が増す。"],"model":["I live in a medium-sized city about an hour from the capital by train. It's mostly residential, so it's fairly quiet, especially at night. There's a big shopping area near the main station, and most of the things I need are within walking distance. A river also runs through the city, and there's a long path along it where families ride bikes on weekends. It's not the most exciting place, but it's convenient and comfortable to live in.","What I like most is that there's a large park just five minutes from my apartment. It has a lot of trees and a pond, and it's a great place to relax after a long day. I usually go for a run there two or three times a week, and it really helps me clear my head. On weekends, I sometimes take a book and read on a bench. Having green space so close makes city life much less stressful for me.","A few years ago, I visited a small town by the sea for a week, and I'd love to live there someday. What impressed me most was how relaxed the pace of life was. People seemed to know each other, and the owner of a small café remembered my order after only two visits. I also loved walking along the beach every morning. Of course, there aren't as many jobs there, but if I could work remotely, I think it would be a perfect place to live.","I think it's better for young people to live in big cities, at least for a few years. Cities offer many more job opportunities and chances to meet people from different backgrounds. For example, a friend of mine moved to a big city after graduation, and she was able to try two different jobs before she found one she really liked. It's true that living costs are higher in cities, but I think the experience is worth it when you're young."],"modelJa":["首都から電車で1時間ほどのところにある、中くらいの規模の市に住んでいます。ほとんどが住宅地なので、特に夜はかなり静かです。中心の駅の近くに大きな商業地区があり、必要なものはたいてい歩いて行ける範囲にそろっています。また、市の中を川が流れていて、川沿いには長い道があり、週末には家族連れが自転車に乗っています。いちばん刺激的な場所というわけではありませんが、便利で住み心地のいいところです。","いちばん気に入っているのは、アパートからほんの5分のところに大きな公園があることです。木がたくさんあって池もあり、長い一日の終わりにくつろぐには最高の場所です。たいてい週に2、3回そこへ走りに行っていて、頭をすっきりさせるのに本当に役立っています。週末には、本を持って行ってベンチで読むこともあります。緑がこんなに近くにあるおかげで、都会での生活のストレスがずっと少なくなっています。","数年前、海辺の小さな町を1週間訪れたのですが、いつかそこに住んでみたいと思っています。いちばん印象に残ったのは、生活のペースがとてものんびりしていたことです。町の人たちはお互いに顔見知りのようで、小さなカフェの店主は、私が2回行っただけで注文を覚えてくれました。毎朝、浜辺を歩くのも大好きでした。もちろん、そこには仕事がそれほど多くありませんが、リモートで働けるなら、住むには完璧な場所だと思います。","若い人は、少なくとも数年間は大都市に住むほうがいいと思います。都市には、仕事の機会も、さまざまな背景を持つ人と出会う機会も、ずっと多くあります。たとえば、私の友人は卒業後に大都市へ引っ越し、本当に気に入る仕事を見つけるまでに、2つの違う仕事を経験することができました。たしかに都市では生活費が高くなりますが、若いうちなら、その経験にはそれだけの価値があると思います。"]}
+};
+/* TRANS:END */
 
 const TASKS = {
   vocab:{sec:"Aa",name:"単語"},
@@ -1974,25 +2062,31 @@ const GEN = {
   ctw: () => `Write one original academic paragraph for TOEFL iBT (2026 format) "Complete the Words" practice. Topic area: ${pick(TOPICS)}. Requirements: 4 or 5 sentences, 70-95 words, accurate facts, clear university-level English, no numbers, no hyphenated words, no contractions, no quotation marks. Return JSON only: {"title":"short English title","text":"the paragraph"}`,
   daily: () => `Create one original TOEFL iBT (2026 format) "Read in Daily Life" practice item: a short real-world text that a university student might read (choose one: ${pick(["campus notice","email from a professor","club flyer","dormitory announcement","text-message exchange","cafeteria menu notice","course schedule change","job posting","event invitation"])}). 90-140 words, use \\n for line breaks. Then write 3 multiple-choice questions (main purpose, a specific detail, and an inference or vocabulary-in-context question), each with 4 options and exactly one correct answer; vary the position of the correct answer. Explanations in Japanese. Return JSON only: {"kind":"Notice/Email/etc.","title":"...","body":"...","questions":[${QSPEC}]}`,
   academic: () => `Write one original TOEFL iBT (2026 format) "Read an Academic Passage" item on ${pick(TOPICS)}. 4 paragraphs, 260-320 words total, accurate facts, the style of an introductory university textbook. Then write 5 multiple-choice questions: vocabulary in context, factual detail, negative factual (EXCEPT), rhetorical purpose ("Why does the author mention..."), and inference. Each has 4 options, exactly one correct; vary the correct position. Refer to paragraphs by number. Explanations in Japanese. Return JSON only: {"title":"...","paragraphs":["...","...","...","..."],"questions":[${QSPEC}]}`,
-  choose: () => `Create 6 original TOEFL iBT (2026 format) "Listen and Choose a Response" items in campus and daily-life contexts. Each item: one short spoken statement or question (5-16 words) and 4 written responses with exactly one natural, appropriate response. Distractors should use common traps: repeating a word from the prompt, similar-sounding words, wrong tense, or answering a different question. Vary the position of the correct answer. Explanations in Japanese. Return JSON only: {"items":[{"say":"...","opts":["...","...","...","..."],"a":0,"exp":"日本語の解説"}]}`,
+  choose: () => `Create 6 original TOEFL iBT (2026 format) "Listen and Choose a Response" items in campus and daily-life contexts. Each item: one short spoken statement or question (5-16 words) and 4 written responses with exactly one natural, appropriate response. Distractors should use common traps: repeating a word from the prompt, similar-sounding words, wrong tense, or answering a different question. Vary the position of the correct answer. Explanations in Japanese. For each item also give "ja": natural Japanese translations of the statement and of the 4 responses (same order as "opts"). Return JSON only: {"items":[{"say":"...","opts":["...","...","...","..."],"a":0,"exp":"日本語の解説","ja":{"say":"発言の和訳","opts":["Aの和訳","Bの和訳","Cの和訳","Dの和訳"]}}]}`,
   talk: () => { const t = pick(["conversation","announcement","lecture"]); return `Create one original TOEFL iBT (2026 format) Listening item of type "${t}"${t === "lecture" ? " (an academic talk on " + pick(TOPICS) + ")" : t === "conversation" ? " (two people on a university campus)" : " (a campus announcement)"}. 140-230 words of natural spoken English with fillers like "well" or "so" where natural. Split into lines by speaker; speaker labels such as "Student", "Professor", "Advisor", "Announcer", "Woman", "Man". Then 3 multiple-choice questions (gist, detail, and inference or speaker's purpose), 4 options each, exactly one correct, vary the position. Explanations in Japanese. Return JSON only: {"type":"${t}","title":"日本語の短いタイトル","lines":[{"sp":"Professor","text":"..."}],"questions":[${QSPEC}]}`; },
-  bas: () => `Create 6 original TOEFL iBT (2026 format) "Build a Sentence" items. Each shows a line one student says ("ctx"), and the reply must be built by ordering word chunks. Fields: "pre" (fixed words before the chunks, may be ""), "answer" (4-7 chunks in the ONLY correct order, each 1-3 words), "post" (punctuation after, usually "." or "?"), "extra" (one plausible but unnecessary distractor word, or null). Test grammar such as embedded questions, relative clauses, conditionals, passive voice, present perfect, subjunctive after suggest/recommend, and comparatives. The complete reply (pre + chunks + post) must be natural and have exactly one grammatical order. Return JSON only: {"items":[{"ctx":"...","pre":"...","answer":["...","..."],"post":".","extra":"..."}]}`,
-  email: () => `Create one original TOEFL iBT (2026 format) "Write an Email" prompt for a university student: a realistic situation (campus, work, community), a named recipient with their role, and exactly 3 things the email must do. Return JSON only: {"title":"日本語の短いタイトル","to":"Name, role","scenario":"1-2 sentences in English","bullets":["...","...","..."]}`,
-  disc: () => `Create one original TOEFL iBT (2026 format) "Write for an Academic Discussion" prompt. A professor in a university course posts a question (60-90 words, ends with a clear question). Two students reply with different views (35-55 words each). Return JSON only: {"title":"日本語の短いタイトル","course":"course name","profName":"Dr. ...","prof":"...","students":[{"name":"...","text":"..."},{"name":"...","text":"..."}]}`,
-  repeat: () => `Create one original TOEFL iBT (2026 format) "Listen and Repeat" set: 7 sentences a campus guide might say in one situation (${pick(["museum tour","dormitory move-in","sports center","career center","bookstore","dining hall","science lab","campus clinic","art studio"])}). Sentence lengths increase from about 3 words to about 16 words. Natural spoken English. Return JSON only: {"title":"日本語の場面名","sentences":["...","...","...","...","...","...","..."]}`,
-  interview: () => `Create one original TOEFL iBT (2026 format) "Take an Interview" set: a researcher interviews a participant about one everyday topic. 4 questions that progress from personal facts, to describing an experience, to giving and supporting an opinion. Return JSON only: {"topic":"日本語のトピック名","questions":["...","...","...","..."]}`
+  bas: () => `Create 6 original TOEFL iBT (2026 format) "Build a Sentence" items. Each shows a line one student says ("ctx"), and the reply must be built by ordering word chunks. Fields: "pre" (fixed words before the chunks, may be ""), "answer" (4-7 chunks in the ONLY correct order, each 1-3 words), "post" (punctuation after, usually "." or "?"), "extra" (one plausible but unnecessary distractor word, or null). Test grammar such as embedded questions, relative clauses, conditionals, passive voice, present perfect, subjunctive after suggest/recommend, and comparatives. The complete reply (pre + chunks + post) must be natural and have exactly one grammatical order. For each item also give "ja", in Japanese: "ctx" (a natural translation of the first student's line), "ans" (a natural translation of the complete reply), and "exp" (2-3 sentences explaining the grammar that decides the word order and, if there is a distractor, why it does not fit). Return JSON only: {"items":[{"ctx":"...","pre":"...","answer":["...","..."],"post":".","extra":"...","ja":{"ctx":"相手の発言の和訳","ans":"完成した返答の和訳","exp":"日本語の解説（2〜3文）"}}]}`,
+  email: () => `Create one original TOEFL iBT (2026 format) "Write an Email" prompt for a university student: a realistic situation (campus, work, community), a named recipient with their role, and exactly 3 things the email must do. Also give "ja": natural Japanese translations of the situation and of the 3 things (same order as "bullets"). Return JSON only: {"title":"日本語の短いタイトル","to":"Name, role","scenario":"1-2 sentences in English","bullets":["...","...","..."],"ja":{"scenario":"状況説明の和訳","bullets":["和訳","和訳","和訳"]}}`,
+  disc: () => `Create one original TOEFL iBT (2026 format) "Write for an Academic Discussion" prompt. A professor in a university course posts a question (60-90 words, ends with a clear question). Two students reply with different views (35-55 words each). Also give "ja": natural Japanese translations of the professor's post and of the two student posts (same order as "students"). Return JSON only: {"title":"日本語の短いタイトル","course":"course name","profName":"Dr. ...","prof":"...","students":[{"name":"...","text":"..."},{"name":"...","text":"..."}],"ja":{"prof":"教授の投稿の和訳","students":["1人目の投稿の和訳","2人目の投稿の和訳"]}}`,
+  repeat: () => `Create one original TOEFL iBT (2026 format) "Listen and Repeat" set: 7 sentences a campus guide might say in one situation (${pick(["museum tour","dormitory move-in","sports center","career center","bookstore","dining hall","science lab","campus clinic","art studio"])}). Sentence lengths increase from about 3 words to about 16 words. Natural spoken English. Also give "ja": a natural Japanese translation of each sentence (same order). Return JSON only: {"title":"日本語の場面名","sentences":["...","...","...","...","...","...","..."],"ja":{"sentences":["和訳","和訳","和訳","和訳","和訳","和訳","和訳"]}}`,
+  interview: () => `Create one original TOEFL iBT (2026 format) "Take an Interview" set: a researcher interviews a participant about one everyday topic. 4 questions that progress from personal facts, to describing an experience, to giving and supporting an opinion. Also give "ja": a natural Japanese translation of each question (same order). Return JSON only: {"topic":"日本語のトピック名","questions":["...","...","...","..."],"ja":{"questions":["和訳","和訳","和訳","和訳"]}}`
 };
+/* `ja`: an AI item's own translations, in the shape of its TRANS entry (short tasks only; the long ones would risk a cut-off reply).
+   A `ja` that does not fit is dropped and the item is kept, so a bad translation never makes the generation fail.
+   jaA: exactly n non-empty strings (n = the length of the English list as the AI returned it, before any slice) */
+const jaS = v => typeof v === "string" && v.trim() !== "";
+const jaA = (a, n) => Array.isArray(a) && a.length === n && a.every(jaS);
+const withJa = (it, ja) => { if (ja) it.ja = ja; return it; };
 const CHECK = {
   ctw: o => { if (typeof o.text !== "string" || (o.text.match(/[.!?]/g) || []).length < 3) bad(); return [{id:uid("c"), title:String(o.title || "AI Passage"), text:o.text.trim()}]; },
   daily: o => { if (typeof o.body !== "string" || !Array.isArray(o.questions) || o.questions.filter(okQ).length < 2) bad(); return [{id:uid("d"), kind:String(o.kind || "Text"), title:String(o.title || ""), body:o.body, questions:o.questions.filter(okQ)}]; },
   academic: o => { if (!Array.isArray(o.paragraphs) || o.paragraphs.length < 3 || !Array.isArray(o.questions) || o.questions.filter(okQ).length < 3) bad(); return [{id:uid("a"), title:String(o.title || ""), paragraphs:o.paragraphs.map(String), questions:o.questions.filter(okQ)}]; },
-  choose: o => { const it = Array.isArray(o.items) ? o.items.filter(x => x && typeof x.say === "string" && okQ({q:x.say, opts:x.opts, a:x.a})) : []; if (it.length < 3) bad(); return it.map(x => ({id:uid("ch"), say:x.say, opts:x.opts, a:x.a, exp:String(x.exp || "")})); },
+  choose: o => { const it = Array.isArray(o.items) ? o.items.filter(x => x && typeof x.say === "string" && okQ({q:x.say, opts:x.opts, a:x.a})) : []; if (it.length < 3) bad(); return it.map(x => { const j = x.ja; return withJa({id:uid("ch"), say:x.say, opts:x.opts, a:x.a, exp:String(x.exp || "")}, j && jaS(j.say) && jaA(j.opts, 4) ? {say:j.say, opts:j.opts.slice()} : null); }); },
   talk: o => { if (!Array.isArray(o.lines) || o.lines.length < 1 || !o.lines.every(l => l && typeof l.text === "string") || !Array.isArray(o.questions) || o.questions.filter(okQ).length < 2) bad(); return [{id:uid("t"), type:["conversation","announcement","lecture"].includes(o.type) ? o.type : "lecture", title:String(o.title || "AI Listening"), lines:o.lines.map(l => ({sp:String(l.sp || "Speaker"), text:l.text})), questions:o.questions.filter(okQ)}]; },
-  bas: o => { const it = Array.isArray(o.items) ? o.items.filter(x => x && typeof x.ctx === "string" && Array.isArray(x.answer) && x.answer.length >= 3 && x.answer.every(c => typeof c === "string" && c.trim())) : []; if (it.length < 3) bad(); return it.map(x => ({id:uid("b"), ctx:x.ctx, pre:String(x.pre || ""), answer:x.answer.map(c => c.trim()), post:String(x.post == null ? "." : x.post), extra:x.extra ? String(x.extra) : null})); },
-  email: o => { if (typeof o.scenario !== "string" || !Array.isArray(o.bullets) || o.bullets.length < 3) bad(); return [{id:uid("e"), title:String(o.title || "AIのお題"), to:String(o.to || ""), scenario:o.scenario, bullets:o.bullets.slice(0, 3).map(String)}]; },
-  disc: o => { if (typeof o.prof !== "string" || !Array.isArray(o.students) || o.students.length < 2) bad(); return [{id:uid("g"), title:String(o.title || "AIのお題"), course:String(o.course || ""), profName:String(o.profName || "Professor"), prof:o.prof, students:o.students.slice(0, 2).map(s => ({name:String(s.name || "Student"), text:String(s.text || "")}))}]; },
-  repeat: o => { if (!Array.isArray(o.sentences) || o.sentences.length < 5) bad(); return [{id:uid("r"), title:String(o.title || "AIセット"), sentences:o.sentences.slice(0, 7).map(String)}]; },
-  interview: o => { if (!Array.isArray(o.questions) || o.questions.length < 3) bad(); return [{id:uid("i"), topic:String(o.topic || "AIトピック"), questions:o.questions.slice(0, 4).map(String)}]; }
+  bas: o => { const it = Array.isArray(o.items) ? o.items.filter(x => x && typeof x.ctx === "string" && Array.isArray(x.answer) && x.answer.length >= 3 && x.answer.every(c => typeof c === "string" && c.trim())) : []; if (it.length < 3) bad(); return it.map(x => { const j = x.ja; return withJa({id:uid("b"), ctx:x.ctx, pre:String(x.pre || ""), answer:x.answer.map(c => c.trim()), post:String(x.post == null ? "." : x.post), extra:x.extra ? String(x.extra) : null}, j && jaS(j.ctx) && jaS(j.ans) && jaS(j.exp) ? {ctx:j.ctx, ans:j.ans, exp:j.exp} : null); }); },
+  email: o => { if (typeof o.scenario !== "string" || !Array.isArray(o.bullets) || o.bullets.length < 3) bad(); const j = o.ja; return [withJa({id:uid("e"), title:String(o.title || "AIのお題"), to:String(o.to || ""), scenario:o.scenario, bullets:o.bullets.slice(0, 3).map(String)}, j && jaS(j.scenario) && jaA(j.bullets, o.bullets.length) ? {scenario:j.scenario, bullets:j.bullets.slice(0, 3)} : null)]; },
+  disc: o => { if (typeof o.prof !== "string" || !Array.isArray(o.students) || o.students.length < 2 || !o.students.slice(0, 2).every(s => s && typeof s === "object")) bad(); const j = o.ja; return [withJa({id:uid("g"), title:String(o.title || "AIのお題"), course:String(o.course || ""), profName:String(o.profName || "Professor"), prof:o.prof, students:o.students.slice(0, 2).map(s => ({name:String(s.name || "Student"), text:String(s.text || "")}))}, j && jaS(j.prof) && jaA(j.students, o.students.length) ? {prof:j.prof, students:j.students.slice(0, 2)} : null)]; },
+  repeat: o => { if (!Array.isArray(o.sentences) || o.sentences.length < 5) bad(); const j = o.ja; return [withJa({id:uid("r"), title:String(o.title || "AIセット"), sentences:o.sentences.slice(0, 7).map(String)}, j && jaA(j.sentences, o.sentences.length) ? {sentences:j.sentences.slice(0, 7)} : null)]; },
+  interview: o => { if (!Array.isArray(o.questions) || o.questions.length < 3) bad(); const j = o.ja; return [withJa({id:uid("i"), topic:String(o.topic || "AIトピック"), questions:o.questions.slice(0, 4).map(String)}, j && jaA(j.questions, o.questions.length) ? {questions:j.questions.slice(0, 4)} : null)]; }
 };
 async function generate(k) {
   const o = await askAI(GEN[k]());
@@ -2052,17 +2146,57 @@ Return JSON only: {"score":4,"summary":"総評2〜3文","strengths":["..."],"imp
 const view = () => $("#view");
 function head(key) { const h = HEADS[key]; return `<div class="sec-head"><span class="sec-letter">${h[0]}</span><div><h1>${h[1]}</h1><p>${esc(h[2])}</p></div></div>`; }
 function seg(sec, items, cur) { return `<div class="seg" role="tablist">${items.map(([v, l]) => `<button role="tab" aria-selected="${v === cur}" class="${v === cur ? "on" : ""}" data-act="seg" data-sec="${sec}" data-v="${v}">${esc(l)}</button>`).join("")}</div>`; }
-/* four answer buttons; once `ans` is set they lock and show right / wrong */
-function optsHTML(q, ans, act, extra) {
-  return q.opts.map((o, j) => { let cls = ""; if (ans != null) { if (j === q.a) cls = " right"; else if (j === ans) cls = " wrong"; } return `<button class="opt${cls}" data-act="${act}" data-o="${j}"${extra || ""}${ans != null ? " disabled" : ""}><span class="L">${LET[j]}</span><span>${esc(o)}</span></button>`; }).join("");
+/* ---- translations and notes: TRANS[id], or an AI-made item's own `ja` of the same shape. They go into the page only after the answer.
+   Every reader below accepts a missing or malformed entry and then shows nothing (items without an entry, old saved AI items). ---- */
+function trOf(it) {
+  if (!it || typeof it !== "object") return null;
+  const t = it.ja && typeof it.ja === "object" ? it.ja : (typeof it.id === "string" && Object.prototype.hasOwnProperty.call(TRANS, it.id) ? TRANS[it.id] : null);
+  return t && typeof t === "object" ? t : null;
 }
-function qsHTML(qs, key, id) {
-  UI.cur = {key, id, qs, ans:new Array(qs.length).fill(null), logged:false};
+const trS = v => typeof v === "string" ? v.trim() : "";
+/* a list of n strings ("" where an entry is not a string), or null: a list of another length cannot be matched to its English by index */
+const trArr = (a, n) => Array.isArray(a) && a.length === n ? a.map(trS) : null;
+/* the list `key` of an item's translation, matched against the item's own list `src` (repeat: sentences; interview: tips against questions) */
+function trList(it, key, src) { const t = trOf(it), a = it && it[src || key]; return t && Array.isArray(a) ? trArr(t[key], a.length) : null; }
+/* question i of an item with `questions`: {q, opts} (opts in the item's own order, or null), or null */
+function trQ(it, i) {
+  const t = trOf(it), qs = it && it.questions;
+  if (!t || !Array.isArray(qs) || !Array.isArray(t.qs) || t.qs.length !== qs.length) return null;
+  const x = t.qs[i], q = qs[i];
+  return x && typeof x === "object" && q ? {q:trS(x.q), opts:Array.isArray(q.opts) ? trArr(x.opts, q.opts.length) : null} : null;
+}
+const trLine = (s, note) => (s = trS(s)) ? `<span class="tr${note ? " note" : ""}">${esc(s)}</span>` : "";
+/* 「本文の訳」: a Daily Life text (line breaks kept) or an Academic Passage (paragraph by paragraph) */
+function passTrHTML(k, it) {
+  const t = trOf(it); let h = "";
+  if (t && k === "daily") h = esc(trS(t.body));
+  else if (t && k === "academic") h = (trList(it, "paragraphs") || []).map((p, i) => p ? `<p><span class="pn">¶${i + 1}</span>${esc(p)}</p>` : "").join("");
+  return h ? `<details class="ctx"><summary class="small">本文の訳</summary><div class="trx">${h}</div></details>` : "";
+}
+/* a sample answer in English with its translation (email, discussion, interview). The id lets 読み上げ / コピー find the text;
+   it is not the AI feedback's 改善例 (#modelText), which rewrites the learner's own answer */
+function modelHTML(model, ja, head) {
+  model = trS(model); if (!model) return "";
+  const btns = `<span class="row"><button class="btn sm ghost audio-only" data-act="say-model" data-for="trModel">読み上げ</button><button class="btn sm ghost" data-act="copy-model" data-for="trModel">コピー</button></span>`;
+  return `${head ? `<div class="spread"><h3>解答例</h3>${btns}</div>` : btns}<div class="model" id="trModel">${esc(model)}</div>${trS(ja) ? `<p class="trx">${esc(trS(ja))}</p>` : ""}`;
+}
+/* four answer buttons; once `ans` is set they lock and show right / wrong, and take the translations `tr` (one per option) if there are any */
+function optsHTML(q, ans, act, extra, tr) {
+  return q.opts.map((o, j) => { let cls = ""; if (ans != null) { if (j === q.a) cls = " right"; else if (j === ans) cls = " wrong"; } return `<button class="opt${cls}" data-act="${act}" data-o="${j}"${extra || ""}${ans != null ? " disabled" : ""}><span class="L">${LET[j]}</span><span>${esc(o)}${ans != null && tr ? trLine(tr[j]) : ""}</span></button>`; }).join("");
+}
+/* the verdict and the item's explanation; `letter`: name the right option after a wrong answer (Choose a Response does not) */
+const expHTML = (q, ans, letter) => `<div class="exp">${ans === q.a ? "<b>正解。</b>" : "<b>不正解。</b>" + (letter ? "正解は " + LET[q.a] + "。" : "")}${esc(q.exp || "")}</div>`;
+function qsHTML(it, key) {
+  const qs = it.questions;
+  UI.cur = {key, id:it.id, it, qs, ans:new Array(qs.length).fill(null), logged:false};
   return `<div>${qs.map((q, i) => `<div class="q" data-q="${i}"><div class="qt">${i + 1}. ${esc(q.q)}</div>${optsHTML(q, null, "ans", ` data-q="${i}"`)}<div class="qexp"></div></div>`).join("")}</div><div id="mcqRes" class="result" aria-live="polite"></div>`;
 }
 const missNote = n => n ? `<p class="muted small" style="font-weight:400">間違えた${n}問は復習リストに入りました（ホームから解き直せます）。</p>` : "";
-function scriptHTML(lines) { return `<div class="script">${lines.map(l => `<p><b>${esc(l.sp)}</b>${esc(l.text)}</p>`).join("")}</div>`; }
+/* `tr`: one translation per line (trList(it, "lines")), given only after the questions are answered */
+function scriptHTML(lines, tr) { return `<div class="script">${lines.map((l, i) => `<p><b>${esc(l.sp)}</b>${esc(l.text)}${tr ? trLine(tr[i]) : ""}</p>`).join("")}</div>`; }
 function rerenderSub(html) { const s = $("#sub"); if (s) s.innerHTML = html; }
+/* after an answer: bring 次へ (or the menu-done box, which sits under it) into view */
+function showNext(sel) { requestAnimationFrame(() => { const e = $("#sub .mdone") || $(sel); if (e) e.scrollIntoView({block:"nearest"}); }); }
 /* 「ホームに戻る」: at the end of a set (main = a task of today's menu) and in the note shown when an answer finishes a menu row */
 const homeBtn = (main, wide) => `<button class="btn${main ? " primary" : ""}${wide ? " wide" : ""}" data-act="home">ホームに戻る</button>`;
 const mdoneLine = rows => rows ? `<p class="mdone-t"><span class="tick" aria-hidden="true">✓</span><span>今日のメニューの${rows.map(r => "『" + esc(r.label) + "』").join("と")}が終わりました</span></p>` : "";
@@ -2343,7 +2477,7 @@ function renderCard() { const c = $("#vcard"); if (c) c.innerHTML = cardHTML(); 
 function buildCTest(text) {
   const sents = text.match(/[^.!?]+[.!?]+["')\]]*\s*/g) || [text];
   const joined = sents.join(""); if (joined.length < text.length) sents.push(text.slice(joined.length));
-  let html = "", blanks = [], cnt = 0;
+  let html = "", blanks = [], words = [], cnt = 0;   /* words: the whole word of each blank, for the list shown after marking */
   sents.forEach((s, si) => {
     if (si === 0 || blanks.length >= 10) { html += esc(s); return; }
     s.split(/(\s+)/).forEach(tok => {
@@ -2352,12 +2486,12 @@ function buildCTest(text) {
       cnt++;
       if (cnt % 2 === 0) {
         const w = m[2], k = Math.floor(w.length / 2), shown = w.slice(0, k), miss = w.slice(k), i = blanks.length;
-        blanks.push(miss);
+        blanks.push(miss); words.push(w);
         html += esc(m[1]) + `<span class="ct">${esc(shown)}<input data-i="${i}" maxlength="${miss.length}" style="width:${miss.length * 0.62 + 0.9}em" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="${esc(shown)}の続き（${miss.length}文字）"></span>` + esc(m[3]);
       } else html += esc(tok);
     });
   });
-  return {html, blanks};
+  return {html, blanks, words};
 }
 function ctwHTML() {
   const P = pool("ctw"); if (UI.ctw.i >= P.length) UI.ctw.i = 0;
@@ -2371,13 +2505,21 @@ function ctwHTML() {
     <div id="ctwRes" aria-live="polite"></div>
   </div>`;
 }
+/* Complete the Words, after marking: the blanked words (taken from the passage, in the order of the blanks) with their meanings, and the whole passage in Japanese */
+function ctwTrHTML(it, words) {
+  const t = trOf(it); if (!t || !Array.isArray(words)) return "";
+  const ws = trArr(t.words, words.length), text = trS(t.text);
+  const list = ws ? words.map((w, i) => ws[i] ? `<li><b>${esc(w)}</b> — ${esc(ws[i])}</li>` : "").join("") : "";
+  const h = (list ? `<div class="exp"><b>空欄の語</b><ul class="trw">${list}</ul></div>` : "") + (text ? `<details class="ctx"><summary class="small">全文の訳</summary><div class="trx">${esc(text)}</div></details>` : "");
+  return h ? `<div class="fb" style="margin-top:8px">${h}</div>` : "";
+}
 function dailyHTML() {
   const P = pool("daily"); if (UI.dailyI >= P.length) UI.dailyI = 0; const it = P[UI.dailyI];
   return `<div class="card">
     <div class="spread"><h2>Read in Daily Life</h2><span class="muted small">${UI.dailyI + 1} / ${P.length}</span></div>
     <p class="muted small">掲示・メール・募集要項など、キャンパス生活の短い文書。目的・詳細・推測を問われます。</p>
     <div class="doc"><span class="doc-kind">${esc(it.kind)}</span>\n<span class="doc-title">${esc(it.title)}</span>\n${esc(it.body)}</div>
-    ${qsHTML(it.questions, "daily", it.id)}
+    ${qsHTML(it, "daily")}
     <div class="row"><button class="btn ghost" data-act="daily-next">次の文書</button><button class="btn ghost ai-only" data-act="daily-ai">AIで新しい文書</button></div><div id="genOut"></div>
   </div>`;
 }
@@ -2387,7 +2529,7 @@ function academicHTML() {
     <div class="spread"><h2>${esc(it.title)}</h2><span class="muted small">${UI.acadI + 1} / ${P.length}</span></div>
     <p class="muted small">教科書レベルの学術文。語彙・詳細・NOT問題・筆者の意図・推測を問われます。</p>
     <div class="passage">${it.paragraphs.map((p, i) => `<p><span class="pn">¶${i + 1}</span>${esc(p)}</p>`).join("")}</div>
-    ${qsHTML(it.questions, "academic", it.id)}
+    ${qsHTML(it, "academic")}
     <div class="row"><button class="btn ghost" data-act="acad-next">次の文章</button><button class="btn ghost ai-only" data-act="acad-ai">AIで新しい文章</button></div><div id="genOut"></div>
   </div>`;
 }
@@ -2402,13 +2544,14 @@ function chooseHTML() {
   const c = UI.ch;
   if (c.done) return `<div class="card"><h2>Listen and Choose a Response</h2><p class="result">結果 <b>${c.correct}</b> / ${c.items.length}</p>${missNote(c.items.length - c.correct)}${mdoneLine(mdoneAt("choose", c))}<div class="row">${homeBtn(true)}<button class="btn" data-act="ch-new">もう1セット</button><button class="btn ghost ai-only" data-act="ch-ai">AIで新しい6問</button></div><div id="genOut"></div></div>`;
   const it = c.items[c.i]; const showOpts = c.plays > 0 || c.reveal || !hasAudio();
+  const t = c.ans != null ? trOf(it) : null;   /* translations: only once this item is answered */
   return `<div class="card">
     <div class="spread"><h2>Listen and Choose a Response</h2><span class="muted small">問 ${c.i + 1} / ${c.items.length}</span></div>
     <p class="muted small">短い発言を聞き、最も自然な応答を選びます。本番は1回だけ再生されます。</p>
     <div class="player audio-only"><button class="play" data-act="ch-play" aria-label="再生">${ICON_PLAY}</button><div><div id="plStat">タップして再生</div><div class="muted small">再生 ${c.plays}回</div></div></div>
-    ${(c.reveal || !hasAudio() || c.ans != null) ? `<p class="script">${esc(it.say)}</p>` : `<button class="btn sm ghost audio-only" data-act="ch-reveal" style="align-self:flex-start">音声が出ないときは文を表示</button>`}
-    ${showOpts ? `<div class="q" style="border-top:0;padding-top:0">${optsHTML(it, c.ans, "ch-ans")}</div>` : `<p class="muted small">再生すると選択肢が表示されます。</p>`}
-    ${c.ans != null ? `<div class="exp">${c.ans === it.a ? "<b>正解。</b>" : "<b>不正解。</b>"}${esc(it.exp || "")}</div><button class="btn primary" data-act="ch-next">${c.i + 1 < c.items.length ? "次へ" : "結果を見る"}</button>${c.i + 1 < c.items.length ? mdoneBox(mdoneAt("choose", c, c.i)) : ""}` : ""}
+    ${(c.reveal || !hasAudio() || c.ans != null) ? `<p class="script">${esc(it.say)}${t ? trLine(t.say) : ""}</p>` : `<button class="btn sm ghost audio-only" data-act="ch-reveal" style="align-self:flex-start">音声が出ないときは文を表示</button>`}
+    ${showOpts ? `<div class="q" style="border-top:0;padding-top:0">${optsHTML(it, c.ans, "ch-ans", "", trList(it, "opts"))}</div>` : `<p class="muted small">再生すると選択肢が表示されます。</p>`}
+    ${c.ans != null ? `${expHTML(it, c.ans)}<button class="btn primary" data-act="ch-next">${c.i + 1 < c.items.length ? "次へ" : "結果を見る"}</button>${c.i + 1 < c.items.length ? mdoneBox(mdoneAt("choose", c, c.i)) : ""}` : ""}
   </div>`;
 }
 function talkTypeJa(t) { return t === "conversation" ? "会話" : t === "announcement" ? "アナウンス" : "講義"; }
@@ -2427,7 +2570,7 @@ function talkHTML() {
     <div><span class="muted small">${talkTypeJa(it.type)}</span><h2>${esc(it.title)}</h2></div>
     <div class="player audio-only"><button class="play" data-act="tk-play" aria-label="再生">${ICON_PLAY}</button><div><div id="plStat">タップして再生</div><div class="muted small">再生 ${UI.tk.plays}回 ・ 約${Math.round(wcount(it.lines.map(l => l.text).join(" ")) / 2.4 / 60 * 10) / 10}分</div></div></div>
     ${!hasAudio() ? `<p class="muted small">この端末では音声が使えないため、スクリプトを読んで解きます。</p>${scriptHTML(it.lines)}` : `<details id="tkScript"><summary class="small">スクリプトを表示</summary>${scriptHTML(it.lines)}</details>`}
-    ${ready ? qsHTML(it.questions, "talk", it.id) : `<button class="btn sm ghost" data-act="tk-skip" style="align-self:flex-start">音声なしで設問を表示</button>`}
+    ${ready ? qsHTML(it, "talk") : `<button class="btn sm ghost" data-act="tk-skip" style="align-self:flex-start">音声なしで設問を表示</button>`}
   </div>`;
 }
 function listeningSub() { return UI.listening === "choose" ? chooseHTML() : talkHTML(); }
@@ -2443,11 +2586,12 @@ function prepTiles(b) { const it = b.items[b.i]; const t = it.answer.slice(); if
 /* the tile board, shared by the Writing tab and the review list (ctx "rv"); the caller adds the "next" button */
 function basBoard(b, ctx) {
   const it = b.items[b.i], c = ctx ? ` data-ctx="${ctx}"` : "";
+  const t = b.res ? trOf(it) : null;   /* after the check, right or wrong: A's line and the finished reply in Japanese, then the explanation */
   const slots = it.answer.map((_, j) => { const p = b.placed[j]; const tile = p != null ? b.tiles.find(x => x.k === p) : null; return `<button class="slot ${tile ? "filled" : ""}" data-act="bas-slot"${c} data-j="${j}" ${b.res ? "disabled" : ""} aria-label="空欄${j + 1}">${tile ? esc(tile.t) : "&nbsp;"}</button>`; }).join("");
-  return `<div class="bubble"><b>A</b>${esc(it.ctx)}</div>
+  return `<div class="bubble"><b>A</b>${esc(it.ctx)}${t ? trLine(t.ctx) : ""}</div>
     <div class="resp"><b>B</b>${esc(it.pre)} ${slots}${esc(it.post)}</div>
     <div class="tiles">${b.tiles.map(x => `<button class="tile" data-act="bas-tile"${c} data-k="${x.k}" ${b.placed.includes(x.k) || b.res ? "disabled" : ""}>${esc(x.t)}</button>`).join("")}</div>
-    ${b.res ? `<div class="exp">${b.res === "ok" ? "<b>正解。</b>" : "<b>不正解。</b>正しくは："}<br><span style="font-family:var(--f-text);font-size:15.5px">${esc((it.pre ? it.pre + " " : "") + it.answer.join(" ") + it.post)}</span>${it.extra ? `<br><span class="small muted">不要な語：${esc(it.extra)}</span>` : ""}</div>`
+    ${b.res ? `<div class="exp">${b.res === "ok" ? "<b>正解。</b>" : "<b>不正解。</b>正しくは："}<br><span style="font-family:var(--f-text);font-size:15.5px">${esc((it.pre ? it.pre + " " : "") + it.answer.join(" ") + it.post)}</span>${t ? trLine(t.ans) : ""}${it.extra ? `<br><span class="small muted">不要な語：${esc(it.extra)}</span>` : ""}${t ? trLine(t.exp, true) : ""}</div>`
       : `<div class="row"><button class="btn primary" data-act="bas-check"${c} ${b.placed.length !== it.answer.length ? "disabled" : ""}>答え合わせ</button><button class="btn ghost" data-act="bas-clear"${c}>やり直す</button></div>`}`;
 }
 function basHTML() {
@@ -2489,12 +2633,28 @@ function writeTaskHTML(k) {
     <p class="no-ai muted small">AI採点はこの画面では使えません。セルフチェックで見直しましょう。</p>
     <div id="wSelf"></div>
     <div id="wFb" aria-live="polite"></div>
+    <div id="wTr"></div>
     <div id="wHome"></div>
     ${hist.length ? `<details><summary class="small">これまでの提出（${hist.length}）</summary><ul class="hist">${hist.map(h => `<li><div class="spread small"><b>${esc(h.title)}</b><span>${h.score != null ? fbScore(h.score).toFixed(1) + " / 5" : ""} ・ ${new Date(h.t).toLocaleDateString("ja-JP")}</span></div><p class="small muted">${esc(h.summary || "")}</p></li>`).join("")}</ul></details>` : ""}
   </div>`;
 }
 /* one slot for both ways of finishing (self-check, AI feedback), so the button never appears twice */
 function wHome() { const h = $("#wHome"); if (h) h.innerHTML = `<div class="row">${homeBtn(false)}</div>`; }
+/* email / discussion, once handed in: the prompt in Japanese, advice, and a sample answer (解答例; the AI feedback's own 改善例 is a rewrite of the learner's text) */
+function wTrHTML(k, it) {
+  const t = trOf(it); if (!t) return "";
+  const who = (n, s) => s ? `<p><span class="pn">${esc(n)}</span>${esc(s)}</p>` : "";
+  let q;
+  if (k === "email") { const b = trList(it, "bullets"), li = b ? b.map(x => x ? `<li>${esc(x)}</li>` : "").join("") : ""; q = (trS(t.scenario) ? `<p>${esc(trS(t.scenario))}</p>` : "") + (li ? `<ul>${li}</ul>` : ""); }
+  else { const s = trList(it, "students"); q = who(it.profName, trS(t.prof)) + (s ? it.students.map((x, i) => who(x && x.name, s[i])).join("") : ""); }
+  if (q) q = `<div class="trx">${q}</div>`;
+  const tips = trS(t.tips), m = modelHTML(t.model, t.modelJa);
+  const h = (q ? `<div><h3>お題の訳</h3>${q}</div>` : "") + (tips ? `<div><h3>解説</h3><p class="trx">${esc(tips)}</p></div>` : "") + (m ? `<details class="ctx"><summary class="small">解答例</summary><div class="fb">${m}</div></details>` : "");
+  return h ? `<div class="card inset fb">${h}</div>` : "";
+}
+/* filled once per prompt, by either way of finishing; a second press leaves the open fold as it is.
+   `id`: the prompt that was handed in (AI feedback arrives later; if another prompt is on screen by then, that one has not been answered) */
+function wTr(id) { const b = $("#wTr"), ta = $("#wText"); if (!b || !ta || b.innerHTML || (id != null && ta.dataset.id !== id)) return; const k = ta.dataset.k, it = pool(k).find(x => x.id === ta.dataset.id); if (it) b.innerHTML = wTrHTML(k, it); }
 function writingSub() { return UI.writing === "bas" ? basHTML() : writeTaskHTML(UI.writing); }
 function writingView() { view().innerHTML = head("writing") + seg("writing", [["bas","Build a Sentence"],["email","Write an Email"],["disc","Academic Discussion"]], UI.writing) + `<div id="sub">${writingSub()}</div>`; if (UI.writing === "bas") startBasTimer(); }
 
@@ -2518,8 +2678,8 @@ function repeatHTML() {
   const r = UI.rp, n = set.sentences.length;
   const pills = `<div class="pills">${P.map(x => `<button class="pill ${x.id === set.id ? "on" : ""}" data-act="rp-set" data-id="${esc(x.id)}">${esc(x.title)}</button>`).join("")}<button class="pill ai-only" data-act="rp-ai">＋AIで作る</button></div><div id="genOut"></div>`;
   if (r.done) {
-    const ok = r.res.filter(x => x >= 0.9).length;
-    return `<div class="card"><h2>Listen and Repeat</h2>${pills}<p class="result">正確に言えた文 <b>${ok}</b> / ${n}</p>${dotsHTML(r.res, -1, n)}<div class="script">${set.sentences.map((s, k) => `<p><b>${k + 1}</b>${esc(s)} <span class="muted small">${r.res[k] != null ? Math.round(r.res[k] * 100) + "%" : ""}</span></p>`).join("")}</div>${mdoneLine(mdoneAt("repeat", r))}<div class="row">${homeBtn(true)}<button class="btn" data-act="rp-restart">もう一度</button></div></div>`;
+    const ok = r.res.filter(x => x >= 0.9).length, ja = trList(set, "sentences");
+    return `<div class="card"><h2>Listen and Repeat</h2>${pills}<p class="result">正確に言えた文 <b>${ok}</b> / ${n}</p>${dotsHTML(r.res, -1, n)}<div class="script">${set.sentences.map((s, k) => `<p><b>${k + 1}</b>${esc(s)} <span class="muted small">${r.res[k] != null ? Math.round(r.res[k] * 100) + "%" : ""}</span>${ja ? trLine(ja[k]) : ""}</p>`).join("")}</div>${mdoneLine(mdoneAt("repeat", r))}<div class="row">${homeBtn(true)}<button class="btn" data-act="rp-restart">もう一度</button></div></div>`;
   }
   const sent = set.sentences[r.i];
   const checked = r.res[r.i] != null;
@@ -2540,8 +2700,9 @@ function repeatHTML() {
 }
 function rpResHTML(sent) {
   const r = UI.rp; const a = r.res[r.i]; const d = r.lastDiff;
-  const more = r.i + 1 < (pool("repeat").find(x => x.id === r.id) || {sentences:[]}).sentences.length;
-  return `<div class="exp">${d ? `<div class="diff">${d}</div>` : `<p class="script" style="background:transparent;padding:0">${esc(sent)}</p>`}<div class="small" style="margin-top:6px">${d ? "一致率 " + Math.round(a * 100) + "%（赤い語が抜け・違い）" : "自己採点：" + (a >= 0.9 ? "言えた" : a >= 0.6 ? "ほぼ言えた" : "言えなかった")}</div></div><button class="btn primary" data-act="rp-next">${more ? "次の文へ" : "結果を見る"}</button>${more ? mdoneBox(mdoneAt("repeat", r, r.i)) : ""}`;
+  const set = pool("repeat").find(x => x.id === r.id) || {sentences:[]}, ja = trList(set, "sentences");
+  const more = r.i + 1 < set.sentences.length;
+  return `<div class="exp">${d ? `<div class="diff">${d}</div>` : `<p class="script" style="background:transparent;padding:0">${esc(sent)}</p>`}${ja ? trLine(ja[r.i]) : ""}<div class="small" style="margin-top:6px">${d ? "一致率 " + Math.round(a * 100) + "%（赤い語が抜け・違い）" : "自己採点：" + (a >= 0.9 ? "言えた" : a >= 0.6 ? "ほぼ言えた" : "言えなかった")}</div></div><button class="btn primary" data-act="rp-next">${more ? "次の文へ" : "結果を見る"}</button>${more ? mdoneBox(mdoneAt("repeat", r, r.i)) : ""}`;
 }
 function interviewHTML() {
   const P = pool("interview"); let set = P.find(x => x.id === UI.iv.id); if (!set) { set = P[0]; UI.iv = newIv(set.id); }
@@ -2549,19 +2710,21 @@ function interviewHTML() {
   v.running = false;   /* every re-render comes after stopAll(), so no answer timer is running now */
   const pills = `<div class="pills">${P.map(x => `<button class="pill ${x.id === set.id ? "on" : ""}" data-act="iv-set" data-id="${esc(x.id)}">${esc(x.topic)}</button>`).join("")}<button class="pill ai-only" data-act="iv-ai">＋AIで作る</button></div><div id="genOut"></div>`;
   if (v.done) {
-    const sc = v.scores.filter(x => x != null);
+    const sc = v.scores.filter(x => x != null), ja = trList(set, "questions");
     return `<div class="card"><h2>Take an Interview</h2>${pills}${sc.length ? `<p class="result">AI評価の平均 <b>${(sc.reduce((a, c) => a + c, 0) / sc.length).toFixed(1)}</b> / 5</p>` : `<p class="result">${n}問終了</p>`}
-      <div class="script">${set.questions.map((q, k) => `<p><b>Q${k + 1}</b>${esc(q)}${v.ans[k] ? `<br><span class="small muted">あなた：${esc(v.ans[k])}</span>` : ""}${v.scores[k] != null ? ` <span class="small"><b>${fbScore(v.scores[k]).toFixed(1)}</b></span>` : ""}</p>`).join("")}</div>
+      <div class="script">${set.questions.map((q, k) => `<p><b>Q${k + 1}</b>${esc(q)}${ja ? trLine(ja[k]) : ""}${v.ans[k] ? `<br><span class="small muted">あなた：${esc(v.ans[k])}</span>` : ""}${v.scores[k] != null ? ` <span class="small"><b>${fbScore(v.scores[k]).toFixed(1)}</b></span>` : ""}</p>`).join("")}</div>
       ${mdoneLine(mdoneAt("interview", v))}<div class="row">${homeBtn(true)}<button class="btn" data-act="iv-restart">もう一度</button></div></div>`;
   }
   const q = set.questions[v.i];
+  const over = ivOver(v), qja = over ? trLine((trList(set, "questions") || [])[v.i]) : "";
   return `<div class="card">
     <div class="spread"><h2>Take an Interview</h2><span class="timer" id="ivT">0:45</span></div>
     ${pills}
     <p class="muted small">研究者の質問に答えます。各45秒・準備時間なし。質問を聞いたらすぐ「回答開始」。</p>
     <div class="spread small muted"><span>質問 ${v.i + 1} / ${n}</span><span>${esc(set.topic)}</span></div>
     <div class="player audio-only"><button class="play" data-act="iv-play" aria-label="質問を再生">${ICON_PLAY}</button><div><div id="plStat">${v.played ? "もう一度聞く" : "質問を聞く"}</div><div class="muted small">本番は質問文が画面に出ません</div></div></div>
-    <details ${!hasAudio() ? "open" : ""}><summary class="small">質問文を表示</summary><p class="script" style="margin-top:6px">${esc(q)}</p></details>
+    <details id="ivQ" ${!hasAudio() || qja ? "open" : ""}><summary class="small">質問文を表示</summary><p class="script" style="margin-top:6px">${esc(q)}${qja}</p></details>
+    <div id="ivTr"${over ? ' data-on="1"' : ""}>${over ? ivTrHTML(set, v.i) : ""}</div>
     <div class="row"><button class="btn primary" id="ivGo" data-act="iv-go">${v.went ? "もう一度回答（45秒）" : "回答開始（45秒）"}</button><span class="small muted dict-only">音声入力で書き起こします</span></div>
     <label class="field"><span class="small muted">話した内容（AI添削用・任意）<span class="no-dict">。45秒話したあと、覚えている範囲で英語で書き出してください</span></span>
     <textarea class="write sm" id="ivText" autocapitalize="sentences" autocorrect="off" spellcheck="false">${esc(v.ans[v.i] || "")}</textarea></label>
@@ -2569,6 +2732,22 @@ function interviewHTML() {
     <div id="ivFb" aria-live="polite"></div>
     ${mdoneBox(mdoneAt("interview", v, v.i))}
   </div>`;
+}
+/* the answer to the current question is over: it was started and is not running (stopped or timed out), or its text went to the AI */
+const ivOver = v => (v.went && !v.running) || !!v.ans[v.i];
+/* the fold under the question once its answer is over: advice and a sample answer for question i */
+function ivTrHTML(set, i) {
+  const at = k => (trList(set, k, "questions") || [])[i];
+  const tips = trS(at("tips")), m = modelHTML(at("model"), at("modelJa"), true);
+  return tips || m ? `<details class="ctx"><summary class="small">${tips && m ? "解説と解答例" : tips ? "解説" : "解答例"}</summary><div class="fb">${tips ? `<div><h3>解説</h3><p class="trx">${esc(tips)}</p></div>` : ""}${m}</div></details>` : "";
+}
+/* called where an answer ends without a re-render (ivStop, AI feedback): the question's translation, and the fold. Once per question, so an open fold stays open */
+function ivReveal() {
+  const v = UI.iv, box = $("#ivTr"), set = pool("interview").find(x => x.id === v.id); if (!box || !set || box.dataset.on) return;
+  box.dataset.on = "1";
+  const d = $("#ivQ"), p = d && d.querySelector(".script"), ja = trLine((trList(set, "questions") || [])[v.i]);
+  if (ja && p) { p.insertAdjacentHTML("beforeend", ja); d.open = true; }
+  box.innerHTML = ivTrHTML(set, v.i);
 }
 function speakingSub() { return UI.speaking === "repeat" ? repeatHTML() : interviewHTML(); }
 function speakingView() { view().innerHTML = head("speaking") + `<div class="card inset">${rateSeg()}</div>` + seg("speaking", [["repeat","Listen and Repeat"],["interview","Take an Interview"]], UI.speaking) + `<div id="sub">${speakingSub()}</div>`; }
@@ -2608,16 +2787,19 @@ function reviewHTML() {
   if (!it) return `<div class="card">${top}<p class="muted small">この問題は見つかりませんでした（AIで作った問題が整理された可能性があります）。</p>${next}</div>`;
   const answered = m.k === "bas" ? !!(r.bas && r.bas.res) : r.ans != null;
   const player = (sub) => `<div class="player audio-only"><button class="play" data-act="rv-play" aria-label="再生">${ICON_PLAY}</button><div><div id="plStat">タップして再生</div><div class="muted small">${sub}</div></div></div>`;
+  /* translations, as on the task's own screen and only once this question is answered: under the question, the options and the line of
+     Choose a Response; the text and the script get theirs too (the text as a second fold). Build a Sentence: inside basBoard */
+  const t = answered ? trOf(it) : null, tq = t && m.q != null ? trQ(it, m.q) : null;
   let body = "", task = "";
-  if (m.k === "daily") body = `<details class="ctx" open><summary class="small">文書</summary><div class="doc"><span class="doc-kind">${esc(it.kind)}</span>\n<span class="doc-title">${esc(it.title)}</span>\n${esc(it.body)}</div></details>`;
-  else if (m.k === "academic") body = `<details class="ctx"><summary class="small">本文を読み直す：${esc(it.title)}</summary><div class="passage">${it.paragraphs.map((p, i) => `<p><span class="pn">¶${i + 1}</span>${esc(p)}</p>`).join("")}</div></details>`;
-  else if (m.k === "talk") body = player(talkTypeJa(it.type) + "：" + esc(it.title)) + `<details class="ctx"${hasAudio() ? "" : " open"}><summary class="small">スクリプトを表示</summary>${scriptHTML(it.lines)}</details>`;
-  else if (m.k === "choose") body = player("発言を聞いて、自然な応答を選ぶ") + ((r.reveal || !hasAudio() || answered) ? `<p class="script">${esc(it.say)}</p>` : `<button class="btn sm ghost audio-only" data-act="rv-reveal" style="align-self:flex-start">文を表示</button>`);
+  if (m.k === "daily") body = `<details class="ctx" open><summary class="small">文書</summary><div class="doc"><span class="doc-kind">${esc(it.kind)}</span>\n<span class="doc-title">${esc(it.title)}</span>\n${esc(it.body)}</div></details>${t ? passTrHTML("daily", it) : ""}`;
+  else if (m.k === "academic") body = `<details class="ctx"><summary class="small">本文を読み直す：${esc(it.title)}</summary><div class="passage">${it.paragraphs.map((p, i) => `<p><span class="pn">¶${i + 1}</span>${esc(p)}</p>`).join("")}</div></details>${t ? passTrHTML("academic", it) : ""}`;
+  else if (m.k === "talk") body = player(talkTypeJa(it.type) + "：" + esc(it.title)) + `<details class="ctx"${hasAudio() ? "" : " open"}><summary class="small">スクリプトを表示</summary>${scriptHTML(it.lines, t ? trList(it, "lines") : null)}</details>`;
+  else if (m.k === "choose") body = player("発言を聞いて、自然な応答を選ぶ") + ((r.reveal || !hasAudio() || answered) ? `<p class="script">${esc(it.say)}${t ? trLine(t.say) : ""}</p>` : `<button class="btn sm ghost audio-only" data-act="rv-reveal" style="align-self:flex-start">文を表示</button>`);
   const q = m.k === "choose" ? it : m.k === "bas" ? null : it.questions[m.q];
   if (m.k === "bas") task = basBoard(r.bas, "rv");
-  else if (m.k === "choose") task = (r.plays > 0 || r.reveal || !hasAudio() || answered) ? `<div class="q" style="border-top:0;padding-top:0">${optsHTML(q, r.ans, "rv-ans")}</div>` : `<p class="muted small">再生すると選択肢が表示されます。</p>`;
-  else task = `<div class="q"><div class="qt">${esc(q.q)}</div>${optsHTML(q, r.ans, "rv-ans")}</div>`;
-  const exp = answered && q ? `<div class="exp">${r.ans === q.a ? "<b>正解。</b>" : "<b>不正解。</b>正解は " + LET[q.a] + "。"}${esc(q.exp || "")}</div>` : "";
+  else if (m.k === "choose") task = (r.plays > 0 || r.reveal || !hasAudio() || answered) ? `<div class="q" style="border-top:0;padding-top:0">${optsHTML(q, r.ans, "rv-ans", "", t ? trList(it, "opts") : null)}</div>` : `<p class="muted small">再生すると選択肢が表示されます。</p>`;
+  else task = `<div class="q"><div class="qt">${esc(q.q)}${tq ? trLine(tq.q) : ""}</div>${optsHTML(q, r.ans, "rv-ans", "", tq ? tq.opts : null)}</div>`;
+  const exp = answered && q ? expHTML(q, r.ans, true) : "";
   const status = answered ? `<p class="small${r.ok ? "" : " muted"}">${r.ok ? "リストから外しました。" : "リストに残ります。次の復習でもう一度出ます。"}</p>${next}${r.i + 1 < r.list.length ? mdoneBox(mdoneAt("review", r, r.i)) : ""}` : "";
   return `<div class="card">${top}${body}${task}${exp}${status}</div>`;
 }
@@ -2906,7 +3088,7 @@ const ACT = {
       const old = inp.parentNode.querySelector(".ans"); if (old) old.remove();
       if (!good) { const s = document.createElement("span"); s.className = "ans"; s.textContent = ans; inp.after(s); }
     });
-    $("#ctwRes").innerHTML = `<p class="result">結果 <b>${ok}</b> / ${b.blanks.length}</p><p class="muted small">間違えた語は赤字が正解。語形（複数形・時制）と前後の文法から推測するのがコツです。</p><div class="row" style="margin-top:8px">${homeBtn(false)}</div>`;
+    $("#ctwRes").innerHTML = `<p class="result">結果 <b>${ok}</b> / ${b.blanks.length}</p><p class="muted small">間違えた語は赤字が正解。語形（複数形・時制）と前後の文法から推測するのがコツです。</p>${ctwTrHTML(pool("ctw").find(x => x.id === b.id), b.words)}<div class="row" style="margin-top:8px">${homeBtn(false)}</div>`;
     if (!UI.ctw.checked) { UI.ctw.checked = true; bump("ctw"); logResult("ctw", ok, b.blanks.length); }
   },
   "ctw-next"() { UI.ctw.i = (UI.ctw.i + 1) % pool("ctw").length; UI.ctw.built = null; subRender(); },
@@ -2920,7 +3102,9 @@ const ACT = {
     if (C.ans[qi] != null) return; C.ans[qi] = o; const q = C.qs[qi];
     const box = el.closest(".q");
     $$(".opt", box).forEach((b, j) => { b.disabled = true; if (j === q.a) b.classList.add("right"); else if (j === o) b.classList.add("wrong"); });
-    box.querySelector(".qexp").innerHTML = `<div class="exp">${o === q.a ? "<b>正解。</b>" : "<b>不正解。</b>正解は " + LET[q.a] + "。"}${esc(q.exp || "")}</div>`;
+    box.querySelector(".qexp").innerHTML = expHTML(q, o, true);
+    const tq = trQ(C.it, qi);   /* this question is answered: its translation under the question and under each option */
+    if (tq) { box.querySelector(".qt").insertAdjacentHTML("beforeend", trLine(tq.q)); if (tq.opts) $$(".opt", box).forEach((b, j) => b.lastElementChild.insertAdjacentHTML("beforeend", trLine(tq.opts[j]))); }
     if (o === q.a) clearMiss(C.key, C.id, qi); else addMiss(C.key, C.id, qi);
     if (C.key !== "talk") bump(C.key); else save();
     if (C.ans.every(x => x != null) && !C.logged) {
@@ -2929,8 +3113,11 @@ const ACT = {
       const ok = C.ans.filter((x, i) => x === C.qs[i].a).length;
       const entry = {t:Date.now(), k:C.key, c:ok, n:C.qs.length}; if (C.key === "talk") entry.id = UI.tk.id;
       S.log.push(entry); if (S.log.length > 600) S.log = S.log.slice(-600); save();
-      const r = $("#mcqRes"); if (r) r.innerHTML = `結果 <b>${ok}</b> / ${C.qs.length}` + missNote(C.qs.length - ok) + mdoneLine(rows) + `<div class="row" style="margin-top:8px">${homeBtn(C.key === "talk")}</div>`;
-      if (C.key === "talk") { const d = $("#tkScript"); if (d) d.open = true; }
+      const r = $("#mcqRes"); if (r) r.innerHTML = `結果 <b>${ok}</b> / ${C.qs.length}` + missNote(C.qs.length - ok) + mdoneLine(rows) + passTrHTML(C.key, C.it) + `<div class="row" style="margin-top:8px">${homeBtn(C.key === "talk")}</div>`;
+      if (C.key === "talk") {
+        const d = $("#tkScript"); if (d) d.open = true;
+        const ja = trList(C.it, "lines"), sc = $("#sub div.script"); if (ja && sc) sc.outerHTML = scriptHTML(C.it.lines, ja);   /* the script opens here: now with each line in Japanese */
+      }
     }
   },
   /* listening */
@@ -2945,7 +3132,7 @@ const ACT = {
     if (first || r === "none") { if (route() === "listening" && UI.listening === "choose") rerenderSub(chooseHTML()); }
   },
   "ch-reveal"() { UI.ch.reveal = true; rerenderSub(chooseHTML()); },
-  "ch-ans"(el) { const c = UI.ch, it = c.items[c.i]; if (c.ans != null) return; const snap = menuSnap("choose"); c.ans = Number(el.dataset.o); if (c.ans === it.a) { c.correct++; clearMiss("choose", it.id); } else addMiss("choose", it.id); bump("choose"); menuMark("choose", snap, c, c.i); Speech.stop(); rerenderSub(chooseHTML()); },
+  "ch-ans"(el) { const c = UI.ch, it = c.items[c.i]; if (c.ans != null) return; const snap = menuSnap("choose"); c.ans = Number(el.dataset.o); if (c.ans === it.a) { c.correct++; clearMiss("choose", it.id); } else addMiss("choose", it.id); bump("choose"); menuMark("choose", snap, c, c.i); Speech.stop(); rerenderSub(chooseHTML()); showNext("[data-act=ch-next]"); },
   "ch-next"() { const c = UI.ch; if (c.i + 1 < c.items.length) { c.i++; c.ans = null; c.plays = 0; c.reveal = false; } else { c.done = true; logResult("choose", c.correct, c.items.length); } rerenderSub(chooseHTML()); },
   "ch-new"() { newChooseSet(); rerenderSub(chooseHTML()); },
   "ch-ai"(el) { runAI(el, "genOut", async () => { const it = await generate("choose"); newChooseSet(it); rerenderSub(chooseHTML()); }); },
@@ -2969,7 +3156,7 @@ const ACT = {
     const got = b.placed.map(k => b.tiles.find(x => x.k === k).t).join(" "); const ok = got === it.answer.join(" "); b.res = ok ? "ok" : "ng";
     if (el.dataset.ctx === "rv") rvMark(ok);
     else { const snap = menuSnap("bas"); if (ok) { b.correct++; clearMiss("bas", it.id); } else addMiss("bas", it.id); bump("bas"); menuMark("bas", snap, b, b.i); }
-    re();
+    re(); showNext(el.dataset.ctx === "rv" ? "[data-act=rv-next]" : "[data-act=bas-next]");
   },
   "bas-next"() { const b = UI.bas; if (b.i + 1 < b.items.length) { b.i++; prepTiles(b); } else { b.done = true; Timer.stop(); logResult("bas", b.correct, b.items.length); } rerenderSub(basHTML()); },
   "bas-new"() { newBas(); rerenderSub(basHTML()); startBasTimer(); },
@@ -2984,7 +3171,10 @@ const ACT = {
     el.textContent = "やり直す（タイマー再開）";
   },
   "w-unlock"() { const t = $("#wText"); if (t) { t.readOnly = false; t.focus(); } const s = $("#wSelf"); if (s) s.innerHTML = ""; },
-  "w-self"() { const k = UI.writing; const s = $("#wSelf"); if (!s) return; const ta = $("#wText"); if (ta && wcount(ta.value) >= 50 && !W_DONE.has(ta.dataset.id)) { W_DONE.add(ta.dataset.id); bump(k); } s.innerHTML = `<div class="card inset"><h3>提出前チェック</h3><ul class="checks">${CHECKS[k].map((c, i) => `<li><label><input type="checkbox" id="chk-${k}-${i}"> ${esc(c)}</label></li>`).join("")}</ul></div>`; wHome(); },
+  "w-self"() { const k = UI.writing; const s = $("#wSelf"); if (!s) return; const ta = $("#wText"); if (ta && wcount(ta.value) >= 50 && !W_DONE.has(ta.dataset.id)) { W_DONE.add(ta.dataset.id); bump(k); } s.innerHTML = `<div class="card inset"><h3>提出前チェック</h3><ul class="checks">${CHECKS[k].map((c, i) => `<li><label><input type="checkbox" id="chk-${k}-${i}"> ${esc(c)}</label></li>`).join("")}</ul></div>`;
+    /* the translation, notes and sample answer are for after writing: not on an empty or near-empty box (same 25 words as AI grading) */
+    if (ta && wcount(ta.value) >= 25) wTr(); else s.insertAdjacentHTML("beforeend", `<p class="muted small">25語以上書いてからもう一度押すと、お題の訳・解説・解答例が出ます。</p>`);
+    wHome(); },
   "w-grade"(el) {
     const k = el.dataset.k, ta = $("#wText"); const text = ta.value.trim();
     if (wcount(text) < 25) { toast("25語以上書いてから採点しましょう"); return; }
@@ -2997,12 +3187,13 @@ const ACT = {
       S.history.push({t:Date.now(), k, title:it.title, score:fbScore(f.score), summary:String(f.summary || "").slice(0, 300), words:wcount(text)});
       if (S.history.length > 30) S.history = S.history.slice(-30);
       if (!W_DONE.has(it.id)) { W_DONE.add(it.id); bump(k); } logScore(k, fbScore(f.score));
-      wHome();
+      wTr(it.id); wHome();
     });
   },
   "w-ai"(el) { const k = el.dataset.k; runAI(el, "genOut", async () => { const it = await generate(k); if (k === "email") UI.em = it[0].id; else UI.dc = it[0].id; subRender(); }); },
-  "say-model"() { const m = $("#modelText"); if (m) Speech.play([{sp:"A", text:m.textContent.slice(0, 1900)}]); },
-  "copy-model"() { const m = $("#modelText"); if (!m) return; try { navigator.clipboard.writeText(m.textContent).then(() => toast("コピーしました"), () => toast("コピーできませんでした。長押しで選択してください")); } catch (e) { toast("コピーできませんでした"); } },
+  /* data-for: the element holding the text (the sample answer #trModel); without it, the AI feedback's 改善例 */
+  "say-model"(el) { const m = document.getElementById(el.dataset.for || "modelText"); if (m) Speech.play([{sp:"A", text:m.textContent.slice(0, 1900)}]); },
+  "copy-model"(el) { const m = document.getElementById(el.dataset.for || "modelText"); if (!m) return; try { navigator.clipboard.writeText(m.textContent).then(() => toast("コピーしました"), () => toast("コピーできませんでした。長押しで選択してください")); } catch (e) { toast("コピーできませんでした"); } },
   /* speaking: repeat */
   "rp-set"(el) { UI.rp = {id:el.dataset.id, i:0, res:[], played:false, shown:false, done:false}; subRender(); },
   "rp-ai"(el) { runAI(el, "genOut", async () => { const it = await generate("repeat"); UI.rp = {id:it[0].id, i:0, res:[], played:false, shown:false, done:false}; subRender(); }); },
@@ -3051,7 +3242,7 @@ const ACT = {
   "iv-grade"(el) {
     const set = pool("interview").find(x => x.id === UI.iv.id); const text = $("#ivText").value.trim();
     if (wcount(text) < 8) { toast("話した内容を英語で書き出してから押してください"); return; }
-    UI.iv.ans[UI.iv.i] = text; Timer.stop();
+    UI.iv.ans[UI.iv.i] = text; if (UI.iv.running) ivStop(); else { Timer.stop(); ivReveal(); }   /* pressed mid-answer: end the answer properly (button label, dictation) */
     const qi = UI.iv.i;
     runAI(el, "ivFb", async () => {
       const f = await askAI(ivPrompt(set.questions[qi], text)); if (f.score == null) bad();
@@ -3073,7 +3264,10 @@ const ACT = {
   "rv-ans"(el) {
     const r = UI.rv; if (!r || r.ans != null) return; const m = r.list[r.i], it = missItem(m); if (!it) return;
     const q = m.k === "choose" ? it : it.questions[m.q];
+    const open = $$("#sub details.ctx").map(d => d.open);   /* keep the passage / script open across the redraw (the translations appear inside it) */
     r.ans = Number(el.dataset.o); Speech.stop(); rvMark(r.ans === q.a); rerenderSub(reviewHTML());
+    $$("#sub details.ctx").forEach((d, i) => { if (i < open.length) d.open = open[i]; });
+    showNext("[data-act=rv-next]");
   },
   "rv-next"() { const r = UI.rv; if (r.i + 1 < r.list.length) { r.i++; prepRv(); } else r.done = true; subRender(); window.scrollTo(0, 0); },
   "rv-new"() { newReview(); subRender(); window.scrollTo(0, 0); },
@@ -3089,7 +3283,7 @@ const ACT = {
 };
 function basCtx(el) { return el.dataset.ctx === "rv" ? [UI.rv.bas, () => rerenderSub(reviewHTML())] : [UI.bas, () => rerenderSub(basHTML())]; }
 function ivBtn() { const b = $("#ivGo"); if (b) { b.classList.toggle("rec-on", UI.iv.running); b.textContent = UI.iv.running ? "回答を終える" : "もう一度回答（45秒）"; } }
-function ivStop() { UI.iv.running = false; Timer.stop(); if (Dict.listening) Dict.stop(); ivBtn(); }
+function ivStop() { UI.iv.running = false; Timer.stop(); if (Dict.listening) Dict.stop(); ivBtn(); ivReveal(); }
 document.addEventListener("click", e => {
   const el = e.target.closest("[data-act]"); if (!el || el.disabled) return;
   const f = ACT[el.dataset.act]; if (f) { e.preventDefault(); f(el, e); }
